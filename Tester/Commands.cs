@@ -81,9 +81,71 @@ namespace UOSteam
             Interpreter.RegisterCommandHandler("unsetalias", DummyCommand);
             Interpreter.RegisterCommandHandler("setalias", DummyCommand);
             Interpreter.RegisterCommandHandler("promptalias", DummyCommand);
+            Interpreter.RegisterCommandHandler("waitforgump", DummyCommand);
+            Interpreter.RegisterCommandHandler("replygump", DummyCommand);
+            Interpreter.RegisterCommandHandler("closegump", DummyCommand);
+            Interpreter.RegisterCommandHandler("clearjournal", DummyCommand);
+            Interpreter.RegisterCommandHandler("waitforjournal", DummyCommand);
+            Interpreter.RegisterCommandHandler("poplist", DummyCommand);
+            Interpreter.RegisterCommandHandler("pushlist", DummyCommand);
+            Interpreter.RegisterCommandHandler("removelist", DummyCommand);
+            Interpreter.RegisterCommandHandler("createlist", DummyCommand);
+            Interpreter.RegisterCommandHandler("clearlist", DummyCommand);
+            Interpreter.RegisterCommandHandler("info", DummyCommand);
+            Interpreter.RegisterCommandHandler("pause", DummyCommand);
+            Interpreter.RegisterCommandHandler("ping", DummyCommand);
+            Interpreter.RegisterCommandHandler("playmacro", DummyCommand);
+            Interpreter.RegisterCommandHandler("playsound", DummyCommand);
+            Interpreter.RegisterCommandHandler("resync", DummyCommand);
+            Interpreter.RegisterCommandHandler("snapshot", DummyCommand);
+            Interpreter.RegisterCommandHandler("hotkeys", DummyCommand);
+            Interpreter.RegisterCommandHandler("where", DummyCommand);
+            Interpreter.RegisterCommandHandler("messagebox", DummyCommand);
+            Interpreter.RegisterCommandHandler("mapuo", DummyCommand);
+            Interpreter.RegisterCommandHandler("clickscreen", DummyCommand);
+            Interpreter.RegisterCommandHandler("paperdoll", DummyCommand);
+            Interpreter.RegisterCommandHandler("helpbutton", DummyCommand);
+            Interpreter.RegisterCommandHandler("guildbutton", DummyCommand);
+            Interpreter.RegisterCommandHandler("questsbutton", DummyCommand);
+            Interpreter.RegisterCommandHandler("logoutbutton", DummyCommand);
+            Interpreter.RegisterCommandHandler("virtue", DummyCommand);
+            Interpreter.RegisterCommandHandler("msg", DummyCommand);
+            Interpreter.RegisterCommandHandler("headmsg", DummyCommand);
+            Interpreter.RegisterCommandHandler("sysmsg", DummyCommand);
 
             // Expressions
             Interpreter.RegisterExpressionHandler("findalias", DummyExpression);
+            Interpreter.RegisterExpressionHandler("contents", DummyExpression);
+            Interpreter.RegisterExpressionHandler("inregion", DummyExpression);
+            Interpreter.RegisterExpressionHandler("skill", DummyExpression);
+            Interpreter.RegisterExpressionHandler("findobject", DummyExpression);
+            Interpreter.RegisterExpressionHandler("distance", DummyExpression);
+            Interpreter.RegisterExpressionHandler("inrange", DummyExpression);
+            Interpreter.RegisterExpressionHandler("buffexists", DummyExpression);
+            Interpreter.RegisterExpressionHandler("property", DummyExpression);
+            Interpreter.RegisterExpressionHandler("findtype", DummyExpression);
+            Interpreter.RegisterExpressionHandler("findlayer", DummyExpression);
+            Interpreter.RegisterExpressionHandler("skillstate", DummyExpression);
+            Interpreter.RegisterExpressionHandler("counttype", DummyExpression);
+            Interpreter.RegisterExpressionHandler("counttypeground", DummyExpression);
+            Interpreter.RegisterExpressionHandler("findwand", DummyExpression);
+            Interpreter.RegisterExpressionHandler("inparty", DummyExpression);
+            Interpreter.RegisterExpressionHandler("infriendslist", DummyExpression);
+            Interpreter.RegisterExpressionHandler("war", DummyExpression);
+            Interpreter.RegisterExpressionHandler("ingump", DummyExpression);
+            Interpreter.RegisterExpressionHandler("gumpexists", DummyExpression);
+            Interpreter.RegisterExpressionHandler("injournal", DummyExpression);
+            Interpreter.RegisterExpressionHandler("listexists", DummyExpression);
+            Interpreter.RegisterExpressionHandler("list", DummyExpression);
+            Interpreter.RegisterExpressionHandler("inlist", DummyExpression);
+
+            // Player Attributes
+            Interpreter.RegisterExpressionHandler("mana", DummyExpression);
+            Interpreter.RegisterExpressionHandler("x", DummyExpression);
+            Interpreter.RegisterExpressionHandler("y", DummyExpression);
+            Interpreter.RegisterExpressionHandler("z", DummyExpression);
+
+            // Object attributes
 
 
             // Aliases
