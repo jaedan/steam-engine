@@ -7,12 +7,6 @@ namespace UOSteam
     {
         private ASTNode _statement;
 
-        // Local aliases. Aliases only hold serial numbers
-        private Dictionary<string, int> _aliases = new Dictionary<string, int>();
-
-        // Local lists.
-        private Dictionary<string, object[]> _lists = new Dictionary<string, object[]>();
-
         // For-loop indices
         private Dictionary<ASTNode, int> _forloops = new Dictionary<ASTNode, int>();
 
@@ -325,6 +319,12 @@ namespace UOSteam
 
     public static class Interpreter
     {
+        // Aliases only hold serial numbers
+        private static Dictionary<string, int> _aliases = new Dictionary<string, int>();
+
+        // Lists
+        private static Dictionary<string, object[]> _lists = new Dictionary<string, object[]>();
+
         public delegate int ExpressionHandler(ref ASTNode node, bool quiet);
 
         private static Dictionary<string, ExpressionHandler> _exprHandlers = new Dictionary<string, ExpressionHandler>();
@@ -332,6 +332,10 @@ namespace UOSteam
         public delegate void CommandHandler(ref ASTNode node, bool quiet, bool force);
 
         private static Dictionary<string, CommandHandler> _commandHandlers = new Dictionary<string, CommandHandler>();
+
+        public delegate int AliasHandler(ref ASTNode node);
+
+        private static Dictionary<string, AliasHandler> _aliasHandlers = new Dictionary<string, AliasHandler>();
 
         public static void RegisterExpressionHandler(string keyword, ExpressionHandler handler)
         {
@@ -355,6 +359,29 @@ namespace UOSteam
             _commandHandlers.TryGetValue(keyword, out CommandHandler handler);
 
             return handler;
+        }
+
+        public static void RegisterAliasHandler(string keyword, AliasHandler handler)
+        {
+            _aliasHandlers[keyword] = handler;
+        }
+
+        public static int GetAlias(ref ASTNode node)
+        {
+            // If a handler is explicitly registered, call that.
+            if (_aliasHandlers.TryGetValue(node.Lexeme, out AliasHandler handler))
+                return handler(ref node);
+
+            int value;
+            if (_aliases.TryGetValue(node.Lexeme, out value))
+                return value;
+
+            return -1;
+        }
+
+        public static void SetAlias(string alias, int serial)
+        {
+            _aliases[alias] = serial;
         }
     }
 }
