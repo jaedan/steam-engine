@@ -2,7 +2,7 @@
 
 namespace UOSteam
 {
-    class Steam
+    class Tester
     {
         static void PrintNode(ASTNode node, int indent)
         {
@@ -27,8 +27,8 @@ namespace UOSteam
             var root = Lexer.Lex("test.uos");
 
             PrintNode(root, 0);
-            
-            
+
+
             Script script = new Script(root);
             while (script.ExecuteNext()) { };
 

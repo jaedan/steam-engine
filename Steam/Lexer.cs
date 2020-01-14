@@ -122,6 +122,11 @@ namespace UOSteam
                     if (line == null)
                         break;
 
+                    line = line.Trim();
+
+                    if (line.StartsWith("//") || line.StartsWith('#'))
+                        continue;
+
                     // Split the line by spaces (unless the space is in quotes)
                     var lexemes = line.Split('\'')
                                    .Select((element, index) => index % 2 == 0 ?

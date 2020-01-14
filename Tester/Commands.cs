@@ -87,7 +87,7 @@ namespace UOSteam
 
 
             // Aliases
-            backpack
+            /*backpack
             bank
             enemy
             friend
@@ -98,7 +98,7 @@ namespace UOSteam
             lefthand
             mount
             righthand
-            self
+            self*/
 
         }
     }
