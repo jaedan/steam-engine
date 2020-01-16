@@ -28,10 +28,11 @@ namespace UOSteam
 
             PrintNode(root, 0);
 
-
             Script script = new Script(root);
-            while (script.ExecuteNext()) { };
 
+            Interpreter.StartScript(script);
+
+            while (Interpreter.ExecuteScripts()) { };
 
             Console.WriteLine("Done!");
         }

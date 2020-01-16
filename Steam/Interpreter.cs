@@ -337,6 +337,8 @@ namespace UOSteam
 
         private static Dictionary<string, AliasHandler> _aliasHandlers = new Dictionary<string, AliasHandler>();
 
+        private static LinkedList<Script> _scripts = new LinkedList<Script>();
+
         public static void RegisterExpressionHandler(string keyword, ExpressionHandler handler)
         {
             _exprHandlers[keyword] = handler;
@@ -382,6 +384,30 @@ namespace UOSteam
         public static void SetAlias(string alias, int serial)
         {
             _aliases[alias] = serial;
+        }
+
+        public static void StartScript(Script script)
+        {
+            _scripts.AddLast(script);
+        }
+
+        public static void StopScript(Script script)
+        {
+            _scripts.Remove(script);
+        }
+
+        public static bool ExecuteScripts()
+        {
+            var node = _scripts.Last;
+
+            while (node != null)
+            {
+                node.Value.ExecuteNext();
+
+                node = node.Previous;
+            }
+
+            return _scripts.Count > 0;
         }
     }
 }
