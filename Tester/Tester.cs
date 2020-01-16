@@ -28,6 +28,8 @@ namespace UOSteam
 
             PrintNode(root, 0);
 
+            Commands.RegisterDummyCommands();
+
             Script script = new Script(root);
 
             Interpreter.StartScript(script);

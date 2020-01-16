@@ -39,7 +39,7 @@ namespace UOSteam
             return true;
         }
 
-        static Commands()
+        public static void RegisterDummyCommands()
         {
             // Commands. From UOSteam Documentation
             Interpreter.RegisterCommandHandler("fly", DummyCommand);
@@ -113,7 +113,45 @@ namespace UOSteam
             Interpreter.RegisterCommandHandler("virtue", DummyCommand);
             Interpreter.RegisterCommandHandler("msg", DummyCommand);
             Interpreter.RegisterCommandHandler("headmsg", DummyCommand);
+            Interpreter.RegisterCommandHandler("partymsg", DummyCommand);
+            Interpreter.RegisterCommandHandler("guildmsg", DummyCommand);
+            Interpreter.RegisterCommandHandler("allymsg", DummyCommand);
+            Interpreter.RegisterCommandHandler("whispermsg", DummyCommand);
+            Interpreter.RegisterCommandHandler("yellmsg", DummyCommand);
             Interpreter.RegisterCommandHandler("sysmsg", DummyCommand);
+            Interpreter.RegisterCommandHandler("chatmsg", DummyCommand);
+            Interpreter.RegisterCommandHandler("emotemsg", DummyCommand);
+            Interpreter.RegisterCommandHandler("promptmsg", DummyCommand);
+            Interpreter.RegisterCommandHandler("timermsg", DummyCommand);
+            Interpreter.RegisterCommandHandler("waitforprompt", DummyCommand);
+            Interpreter.RegisterCommandHandler("cancelprompt", DummyCommand);
+            Interpreter.RegisterCommandHandler("addfriend", DummyCommand);
+            Interpreter.RegisterCommandHandler("removefriend", DummyCommand);
+            Interpreter.RegisterCommandHandler("contextmenu", DummyCommand);
+            Interpreter.RegisterCommandHandler("waitforcontext", DummyCommand);
+            Interpreter.RegisterCommandHandler("ignoreobject", DummyCommand);
+            Interpreter.RegisterCommandHandler("clearignorelist", DummyCommand);
+            Interpreter.RegisterCommandHandler("setskill", DummyCommand);
+            Interpreter.RegisterCommandHandler("waitforproperties", DummyCommand);
+            Interpreter.RegisterCommandHandler("autocolorpick", DummyCommand);
+            Interpreter.RegisterCommandHandler("waitforcontents", DummyCommand);
+            Interpreter.RegisterCommandHandler("miniheal", DummyCommand);
+            Interpreter.RegisterCommandHandler("bigheal", DummyCommand);
+            Interpreter.RegisterCommandHandler("cast", DummyCommand);
+            Interpreter.RegisterCommandHandler("chivalryheal", DummyCommand);
+            Interpreter.RegisterCommandHandler("waitfortarget", DummyCommand);
+            Interpreter.RegisterCommandHandler("canceltarget", DummyCommand);
+            Interpreter.RegisterCommandHandler("target", DummyCommand);
+            Interpreter.RegisterCommandHandler("targettype", DummyCommand);
+            Interpreter.RegisterCommandHandler("targetground", DummyCommand);
+            Interpreter.RegisterCommandHandler("targettile", DummyCommand);
+            Interpreter.RegisterCommandHandler("targettileoffset", DummyCommand);
+            Interpreter.RegisterCommandHandler("targettilerelative", DummyCommand);
+            Interpreter.RegisterCommandHandler("cleartargetqueue", DummyCommand);
+            Interpreter.RegisterCommandHandler("settimer", DummyCommand);
+            Interpreter.RegisterCommandHandler("removetimer", DummyCommand);
+            Interpreter.RegisterCommandHandler("createtimer", DummyCommand);
+
 
             // Expressions
             Interpreter.RegisterExpressionHandler("findalias", DummyExpression);
@@ -140,6 +178,8 @@ namespace UOSteam
             Interpreter.RegisterExpressionHandler("listexists", DummyExpression);
             Interpreter.RegisterExpressionHandler("list", DummyExpression);
             Interpreter.RegisterExpressionHandler("inlist", DummyExpression);
+            Interpreter.RegisterExpressionHandler("timer", DummyExpression);
+            Interpreter.RegisterExpressionHandler("timerexists", DummyExpression);
 
             // Player Attributes
             Interpreter.RegisterExpressionHandler("mana", DummyExpression);
