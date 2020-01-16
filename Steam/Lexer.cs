@@ -105,6 +105,22 @@ namespace UOSteam
 
     public static class Lexer
     {
+        public static T[] Slice<T>(this T[] src, int start, int end)
+        {
+            if (end < start)
+                return new T[0];
+
+            int len = end - start + 1;
+
+            T[] slice = new T[len];
+            for (int i = 0; i < len; i++)
+            {
+                slice[i] = src[i + start];
+            }
+
+            return slice;
+        }
+
         public static ASTNode Lex(string fname)
         {
             ASTNode node = new ASTNode(ASTNodeType.SCRIPT, null, null);
@@ -124,7 +140,7 @@ namespace UOSteam
 
                     line = line.Trim();
 
-                    if (line.StartsWith("//") || line.StartsWith('#'))
+                    if (line.StartsWith("//") || line.StartsWith("#"))
                         continue;
 
                     // Split the line by spaces (unless the space is in quotes)
@@ -161,15 +177,15 @@ namespace UOSteam
             if (lexeme[0] == '@')
             {
                 node.Push(ASTNodeType.QUIET, null);
-                lexeme = lexeme[1..^0];
+                lexeme = lexeme.Substring(1, lexeme.Length - 1);
             }
 
             // A command may end with a '!' symbol. Pick that
             // off.
-            if (lexeme[^1] == '!')
+            if (lexeme.EndsWith("!"))
             {
                 node.Push(ASTNodeType.FORCE, null);
-                lexeme = lexeme[0..^1];
+                lexeme = lexeme.Substring(0, lexeme.Length - 1);
             }
 
             node.Push(ASTNodeType.COMMAND, lexeme);
@@ -222,7 +238,7 @@ namespace UOSteam
                             throw new Exception("Script compilation error");
 
                         var t = statement.Push(ASTNodeType.IF, null);
-                        ParseExpression(ref t, lexemes[1..^0]);
+                        ParseExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
                         break;
                     }
                 case "elseif":
@@ -231,7 +247,7 @@ namespace UOSteam
                             throw new Exception("Script compilation error");
 
                         var t = statement.Push(ASTNodeType.ELSEIF, null);
-                        ParseExpression(ref t, lexemes[1..^0]);
+                        ParseExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
                         break;
                     }
                 case "endif":
@@ -246,7 +262,7 @@ namespace UOSteam
                             throw new Exception("Script compilation error");
 
                         var t = statement.Push(ASTNodeType.WHILE, null);
-                        ParseExpression(ref t, lexemes[1..^0]);
+                        ParseExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
                         break;
                     }
                 case "endwhile":
@@ -261,7 +277,7 @@ namespace UOSteam
                             throw new Exception("Script compilation error");
 
                         var t = statement.Push(ASTNodeType.FOR, null);
-                        ParseExpression(ref t, lexemes[1..^0]);
+                        ParseExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
                         break;
                     }
                 case "endfor":
@@ -298,7 +314,7 @@ namespace UOSteam
                     // It's a regular statement.
                     ParseCommand(ref statement, lexemes[0]);
 
-                    foreach (var lexeme in lexemes[1..^0])
+                    foreach (var lexeme in lexemes.Slice(1, lexemes.Length - 1))
                     {
                         ParseValue(ref statement, lexeme);
                     }
