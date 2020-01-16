@@ -1,4 +1,4 @@
-This is an implementation of the UO Steam scripting language. It is a .NET core 3 assembly, although it should be easily portable to other runtimes. The interpreter is not tied to any particular program, but is instead extensible through the registration of command handlers. By default, all of the handlers print they were executed to the console.
+This is an implementation of the UO Steam scripting language. The interpreter is not tied to any particular program, but is instead extensible through the registration of command handlers. By default, all of the handlers print they were executed to the console.
 
 To run a test of the interpreter, first build it. The output will consist of a library named UOSteam.dll and an application called Tester.exe. The Tester.exe application currently expects a file named "test.uos" containing a Steam script in the same directory as the executable. You can try various valid Steam scripts and it will first print the parsed abstract syntax tree for the script, then execute it.
 
