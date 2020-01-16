@@ -40,7 +40,8 @@ namespace UOSteam
                 case ASTNodeType.IF:
                 case ASTNodeType.ELSEIF:
                 {
-                    var result = EvaluateExpression(node.FirstChild());
+                    var expr = node.FirstChild();
+                    var result = EvaluateExpression(ref expr);
 
                     // Advance to next statement
                     _statement = _statement.Next();
@@ -70,7 +71,8 @@ namespace UOSteam
                     break;
                 case ASTNodeType.WHILE:
                 {
-                    var result = EvaluateExpression(node.FirstChild());
+                    var expr = node.FirstChild();
+                    var result = EvaluateExpression(ref expr);
 
                     // Advance to next statement
                     _statement = _statement.Next();
@@ -235,9 +237,9 @@ namespace UOSteam
             return cont;
         }
 
-        private bool EvaluateExpression(ASTNode expr)
+        private bool EvaluateExpression(ref ASTNode expr)
         {
-            if (expr == null || (expr.Type != ASTNodeType.UNARY_EXPRESSION && expr.Type != ASTNodeType.BINARY_EXPRESSION))
+            if (expr == null || (expr.Type != ASTNodeType.UNARY_EXPRESSION && expr.Type != ASTNodeType.BINARY_EXPRESSION && expr.Type != ASTNodeType.LOGICAL_EXPRESSION))
                 throw new Exception("No expression following control statement");
 
             var node = expr.FirstChild();
@@ -245,21 +247,67 @@ namespace UOSteam
             if (node == null)
                 throw new Exception("Empty expression following control statement");
 
-            if (expr.Type == ASTNodeType.UNARY_EXPRESSION)
-                return EvaluateUnaryExpression(node);
-            else
-                return EvaluateBinaryExpression(node);
+            switch (expr.Type)
+            {
+                case ASTNodeType.UNARY_EXPRESSION:
+                    return EvaluateUnaryExpression(ref node);
+                case ASTNodeType.BINARY_EXPRESSION:
+                    return EvaluateBinaryExpression(ref node);
+            }
+
+            bool lhs = EvaluateExpression(ref node);
+
+            node = node.Next();
+
+            while (node != null)
+            {
+                // Capture the operator
+                var op = node.Type;
+                node = node.Next();
+
+                if (node == null)
+                    throw new Exception("Invalid logical expression");
+
+                bool rhs;
+
+                var e = node.FirstChild();
+
+                switch (node.Type)
+                {
+                    case ASTNodeType.UNARY_EXPRESSION:
+                        rhs = EvaluateUnaryExpression(ref e);
+                        break;
+                    case ASTNodeType.BINARY_EXPRESSION:
+                        rhs = EvaluateBinaryExpression(ref e);
+                        break;
+                    default:
+                        throw new Exception("Nested logical expressions are not possible");
+                }
+
+                switch (op)
+                {
+                    case ASTNodeType.AND:
+                        lhs = lhs && rhs;
+                        break;
+                    case ASTNodeType.OR:
+                        lhs = lhs || rhs;
+                        break;
+                    default:
+                        throw new Exception("Invalid logical operator");
+                }
+
+                node = node.Next();
+            }
+
+            return lhs; 
         }
 
-        private bool EvaluateUnaryExpression(ASTNode node)
+        private bool EvaluateUnaryExpression(ref ASTNode node)
         {
             node = EvaluateModifiers(node, out bool quiet, out _, out bool not);
 
             // Unary expressions are converted to bool.
             var result = ExecuteExpression(ref node, quiet) != 0;
-
-            if (node != null)
-                throw new Exception("Command did not consume all provided arguments");
 
             if (not)
                 return !result;
@@ -267,14 +315,20 @@ namespace UOSteam
                 return result;
         }
 
-        private bool EvaluateBinaryExpression(ASTNode node)
+        private bool EvaluateBinaryExpression(ref ASTNode node)
         {
             int lhs;
             int rhs;
 
             // Evaluate the left hand side
             node = EvaluateModifiers(node, out bool quiet, out _, out _);
-            lhs = ExecuteExpression(ref node, quiet);
+            if (node.Type == ASTNodeType.INTEGER)
+            {
+                lhs = int.Parse(node.Lexeme);
+                node = node.Next();
+            }
+            else
+                lhs = ExecuteExpression(ref node, quiet);
 
             // Capture the operator
             var op = node.Type;
@@ -282,10 +336,13 @@ namespace UOSteam
 
             // Evaluate the right hand side
             node = EvaluateModifiers(node, out quiet, out _, out _);
-            rhs = ExecuteExpression(ref node, quiet);
-
-            if (node != null)
-                throw new Exception("Command did not consume all provided arguments");
+            if (node.Type == ASTNodeType.INTEGER)
+            {
+                rhs = int.Parse(node.Lexeme);
+                node = node.Next();
+            }
+            else
+                rhs = ExecuteExpression(ref node, quiet);
 
             switch (op)
             {

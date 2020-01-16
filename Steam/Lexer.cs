@@ -21,13 +21,17 @@ namespace UOSteam
         REPLAY,
 
         // Operators
-        NOT,
         EQUAL,
         NOT_EQUAL,
         LESS_THAN,
         LESS_THAN_OR_EQUAL,
         GREATER_THAN,
         GREATER_THAN_OR_EQUAL,
+
+        // Logical Operators
+        NOT,
+        AND,
+        OR,
 
         // Value types
         STRING,
@@ -42,6 +46,7 @@ namespace UOSteam
         SCRIPT,
         STATEMENT,
         COMMAND,
+        LOGICAL_EXPRESSION,
         UNARY_EXPRESSION,
         BINARY_EXPRESSION,
     }
@@ -238,7 +243,7 @@ namespace UOSteam
                             throw new Exception("Script compilation error");
 
                         var t = statement.Push(ASTNodeType.IF, null);
-                        ParseExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
+                        ParseLogicalExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
                         break;
                     }
                 case "elseif":
@@ -247,7 +252,7 @@ namespace UOSteam
                             throw new Exception("Script compilation error");
 
                         var t = statement.Push(ASTNodeType.ELSEIF, null);
-                        ParseExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
+                        ParseLogicalExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
                         break;
                     }
                 case "endif":
@@ -262,7 +267,7 @@ namespace UOSteam
                             throw new Exception("Script compilation error");
 
                         var t = statement.Push(ASTNodeType.WHILE, null);
-                        ParseExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
+                        ParseLogicalExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
                         break;
                     }
                 case "endwhile":
@@ -277,7 +282,7 @@ namespace UOSteam
                             throw new Exception("Script compilation error");
 
                         var t = statement.Push(ASTNodeType.FOR, null);
-                        ParseExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
+                        ParseLogicalExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
                         break;
                     }
                 case "endfor":
@@ -340,8 +345,38 @@ namespace UOSteam
             return false;
         }
 
+        private static void ParseLogicalExpression(ref ASTNode node, string[] lexemes)
+        {
+            // The steam language supports logical operators 'and' and 'or'.
+            // Catch those and split the expression into pieces first.
+            // Fortunately, it does not support parenthesis.
+            var expr = node;
+            bool logical = false;
+            int start = 0;
+
+            for (int i = start; i < lexemes.Length; i++)
+            {
+                if (lexemes[i] == "and" || lexemes[i] == "or")
+                {
+                    if (!logical)
+                    {
+                        expr = node.Push(ASTNodeType.LOGICAL_EXPRESSION, null);
+                        logical = true;
+                    }
+
+                    ParseExpression(ref expr, lexemes.Slice(start, i - 1));
+                    start = i + 1;
+                    expr.Push(lexemes[i] == "and" ? ASTNodeType.AND : ASTNodeType.OR, null);
+
+                }
+            }
+
+            ParseExpression(ref expr, lexemes.Slice(start, lexemes.Length - 1));
+        }
+
         private static void ParseExpression(ref ASTNode node, string[] lexemes)
         {
+
             // The steam language supports both unary and
             // binary expressions. First determine what type
             // we have here.
@@ -403,7 +438,16 @@ namespace UOSteam
 
             int i = 0;
 
-            ParseCommand(ref expr, lexemes[i++]);
+            // The expressions on either side of the operator can be integer values
+            // or commands that need to be evaluated.
+            if (int.TryParse(lexemes[i], out int _))
+            {
+                ParseValue(ref expr, lexemes[i++]);
+            }
+            else
+            {
+                ParseCommand(ref expr, lexemes[i++]);
+            }
 
             for (; i < lexemes.Length; i++)
             {
@@ -415,7 +459,14 @@ namespace UOSteam
 
             ParseOperator(ref expr, lexemes[i++]);
 
-            ParseCommand(ref expr, lexemes[i++]);
+            if (int.TryParse(lexemes[i], out int _))
+            {
+                ParseValue(ref expr, lexemes[i++]);
+            }
+            else
+            {
+                ParseCommand(ref expr, lexemes[i++]);
+            }
 
             for (; i < lexemes.Length; i++)
             {
