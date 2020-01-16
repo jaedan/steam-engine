@@ -30,11 +30,13 @@ namespace UOSteam
             return 0;
         }
 
-        private static void DummyCommand(ref ASTNode node, bool quiet, bool force)
+        private static bool DummyCommand(ref ASTNode node, bool quiet, bool force)
         {
             Console.WriteLine("Executing command {0} {1}", node.Type, node.Lexeme);
 
             node = null;
+
+            return true;
         }
 
         static Commands()

@@ -183,8 +183,8 @@ namespace UOSteam
                 case ASTNodeType.QUIET:
                 case ASTNodeType.FORCE:
                 case ASTNodeType.COMMAND:
-                    ExecuteCommand(node);
-                    _statement = _statement.Next();
+                    if (ExecuteCommand(node))
+                        _statement = _statement.Next();
                     break;
             }
 
@@ -218,7 +218,7 @@ namespace UOSteam
             }
         }
 
-        private void ExecuteCommand(ASTNode node)
+        private bool ExecuteCommand(ASTNode node)
         {
             node = EvaluateModifiers(node, out bool quiet, out bool force, out _);
 
@@ -227,10 +227,12 @@ namespace UOSteam
             if (handler == null)
                 throw new Exception("Unknown command");
 
-            handler(ref node, quiet, force);
+            var cont = handler(ref node, quiet, force);
 
             if (node != null)
                 throw new Exception("Command did not consume all available arguments");
+
+            return cont;
         }
 
         private bool EvaluateExpression(ASTNode expr)
@@ -329,7 +331,7 @@ namespace UOSteam
 
         private static Dictionary<string, ExpressionHandler> _exprHandlers = new Dictionary<string, ExpressionHandler>();
 
-        public delegate void CommandHandler(ref ASTNode node, bool quiet, bool force);
+        public delegate bool CommandHandler(ref ASTNode node, bool quiet, bool force);
 
         private static Dictionary<string, CommandHandler> _commandHandlers = new Dictionary<string, CommandHandler>();
 
