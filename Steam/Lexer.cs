@@ -126,6 +126,18 @@ namespace UOSteam
             return slice;
         }
 
+        public static ASTNode Lex(string[] lines)
+        {
+            ASTNode node = new ASTNode(ASTNodeType.SCRIPT, null, null);
+
+            foreach (var line in lines)
+            {
+                ParseLine(ref node, line);
+            }
+
+            return node;
+        }
+
         public static ASTNode Lex(string fname)
         {
             ASTNode node = new ASTNode(ASTNodeType.SCRIPT, null, null);
@@ -143,26 +155,31 @@ namespace UOSteam
                     if (line == null)
                         break;
 
-                    line = line.Trim();
-
-                    if (line.StartsWith("//") || line.StartsWith("#"))
-                        continue;
-
-                    // Split the line by spaces (unless the space is in quotes)
-                    var lexemes = line.Split('\'')
-                                   .Select((element, index) => index % 2 == 0 ?
-                                    element.Split(new char[0], StringSplitOptions.RemoveEmptyEntries) :
-                                    new string[] { element })
-                                   .SelectMany(element => element).ToArray();
-
-                    if (lexemes.Length == 0)
-                        continue;
-
-                    ParseStatement(ref node, lexemes);
+                    ParseLine(ref node, line);
                 }
             }
 
             return node;
+        }
+
+        private static void ParseLine(ref ASTNode node, string line)
+        {
+            line = line.Trim();
+
+            if (line.StartsWith("//") || line.StartsWith("#"))
+                return;
+
+            // Split the line by spaces (unless the space is in quotes)
+            var lexemes = line.Split('\'')
+                           .Select((element, index) => index % 2 == 0 ?
+                            element.Split(new char[0], StringSplitOptions.RemoveEmptyEntries) :
+                            new string[] { element })
+                           .SelectMany(element => element).ToArray();
+
+            if (lexemes.Length == 0)
+                return;
+
+            ParseStatement(ref node, lexemes);
         }
 
         private static void ParseValue(ref ASTNode node, string lexeme)
