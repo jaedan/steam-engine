@@ -461,9 +461,12 @@ namespace UOSteam
 
             while (node != null)
             {
-                node.Value.ExecuteNext();
+                var prev = node.Previous;
 
-                node = node.Previous;
+                if (!node.Value.ExecuteNext())
+                    _scripts.Remove(node);
+
+                node = prev;
             }
 
             return _scripts.Count > 0;
