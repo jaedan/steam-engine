@@ -170,7 +170,7 @@ namespace UOSteam
                 return;
 
             // Split the line by spaces (unless the space is in quotes)
-            var lexemes = line.Split('\'')
+            var lexemes = line.Split('\'', '"')
                            .Select((element, index) => index % 2 == 0 ?
                             element.Split(new char[0], StringSplitOptions.RemoveEmptyEntries) :
                             new string[] { element })
