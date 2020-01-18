@@ -13,12 +13,49 @@ namespace UOSteam
         }
     }
 
+    internal class Scope
+    {
+        public Dictionary<string, object> Namespace = new Dictionary<string, object>();
+
+        public readonly ASTNode StartNode;
+        public readonly Scope Parent;
+
+        public Scope(Scope parent, ASTNode start)
+        {
+            Parent = parent;
+            StartNode = start;
+        }
+    }
+
     public class Script
     {
         private ASTNode _statement;
 
-        // For-loop indices
-        private Dictionary<ASTNode, int> _forloops = new Dictionary<ASTNode, int>();
+        private Scope _scope;
+
+        private object Lookup(string name)
+        {
+            var scope = _scope;
+            object result = null;
+
+            while (scope != null)
+            {
+                if (scope.Namespace.TryGetValue(name, out result))
+                    return result;
+            }
+
+            return result;
+        }
+
+        private void PushScope(ASTNode node)
+        {
+            _scope = new Scope(_scope, node);
+        }
+
+        private void PopScope()
+        {
+            _scope = _scope.Parent;
+        }
 
         // For now, the scripts execute directly from the
         // abstract syntax tree. This is relatively simple.
@@ -30,6 +67,9 @@ namespace UOSteam
         {
             // Set current to the first statement
             _statement = root.FirstChild();
+
+            // Create a default scope
+            _scope = new Scope(null, _statement);
         }
 
         public bool ExecuteNext()
@@ -48,8 +88,9 @@ namespace UOSteam
             switch (node.Type)
             {
                 case ASTNodeType.IF:
-                case ASTNodeType.ELSEIF:
                 {
+                    PushScope(node);
+
                     var expr = node.FirstChild();
                     var result = EvaluateExpression(ref expr);
 
@@ -76,11 +117,17 @@ namespace UOSteam
                     }
                     break;
                 }
+                case ASTNodeType.ELSEIF:
+                    PopScope();
+                    goto case ASTNodeType.IF;
                 case ASTNodeType.ENDIF:
+                    PopScope();
                     _statement = _statement.Next();
                     break;
                 case ASTNodeType.WHILE:
                 {
+                    PushScope(node);
+
                     var expr = node.FirstChild();
                     var result = EvaluateExpression(ref expr);
 
@@ -98,6 +145,7 @@ namespace UOSteam
                             if (node.Type == ASTNodeType.ENDWHILE)
                             {
                                 // Go one past the endwhile so the loop doesn't repeat
+                                PopScope();
                                 _statement = _statement.Next();
                                 break;
                             }
@@ -125,8 +173,12 @@ namespace UOSteam
 
                     if (_statement == null)
                         throw new RunTimeError(node, "Unexpected endwhile");
+
+                    PopScope();
+
                     break;
                 case ASTNodeType.FOR:
+                    PushScope(node);
                     throw new RunTimeError(node, "For loops are not supported yet");
                 case ASTNodeType.ENDFOR:
                     // Walk backward to the for statement
@@ -146,6 +198,8 @@ namespace UOSteam
 
                     if (_statement == null)
                         throw new RunTimeError(node, "Unexpected endfor");
+
+                    PopScope();
                     break;
                 case ASTNodeType.BREAK:
                     // Walk until the end of the loop
@@ -159,12 +213,15 @@ namespace UOSteam
                             node.Type == ASTNodeType.ENDFOR)
                         {
                             // Go one past the end so the loop doesn't repeat
+                            PopScope();
                             _statement = _statement.Next();
                             break;
                         }
 
                         _statement = _statement.Next();
                     }
+
+                    PopScope();
                     break;
                 case ASTNodeType.CONTINUE:
                     // Walk backward to the loop statement
