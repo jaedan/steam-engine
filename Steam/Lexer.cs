@@ -5,6 +5,27 @@ using System.Linq;
 
 namespace UOSteam
 {
+    public class SyntaxError : Exception
+    {
+        public ASTNode Node;
+        public string Line;
+        public int LineNumber;
+
+        public SyntaxError(ASTNode node, string error) : base(error)
+        {
+            Node = node;
+            Line = null;
+            LineNumber = 0;
+        }
+
+        public SyntaxError(string line, int lineNumber, ASTNode node, string error) : base(error)
+        {
+            Line = line;
+            LineNumber = lineNumber;
+            Node = node;
+        }
+    }
+
     public enum ASTNodeType
     {
         // Keywords
@@ -130,12 +151,25 @@ namespace UOSteam
         {
             ASTNode node = new ASTNode(ASTNodeType.SCRIPT, null, null);
 
-            foreach (var line in lines)
+            int i = 0;
+
+            try
             {
-                foreach (var l in line.Split(';'))
+                for (; i < lines.Length; i++)
                 {
-                    ParseLine(ref node, l);
+                    foreach (var l in lines[i].Split(';'))
+                    {
+                        ParseLine(ref node, l);
+                    }
                 }
+            }
+            catch (SyntaxError e)
+            {
+                throw new SyntaxError(lines[i], i, e.Node, e.Message);
+            }
+            catch (Exception e)
+            {
+                throw new SyntaxError(lines[i], i, null, e.Message);
             }
 
             return node;
@@ -147,19 +181,35 @@ namespace UOSteam
 
             using (var file = new StreamReader(fname))
             {
-                while (true)
+                int i = 0;
+                string line = null;
+
+                try
                 {
-                    // Each line in the file is a statement. Statements starting
-                    // with a control flow keyword contain an expression.
+                    while (true)
+                    {
+                        // Each line in the file is a statement. Statements starting
+                        // with a control flow keyword contain an expression.
 
-                    var line = file.ReadLine();
+                        line = file.ReadLine();
 
-                    // End of file
-                    if (line == null)
-                        break;
+                        // End of file
+                        if (line == null)
+                            break;
 
-                    foreach (var l in line.Split(';'))
-                        ParseLine(ref node, line);
+                        foreach (var l in line.Split(';'))
+                            ParseLine(ref node, line);
+
+                        i++;
+                    }
+                }
+                catch (SyntaxError e)
+                {
+                    throw new SyntaxError(line, i, e.Node, e.Message);
+                }
+                catch (Exception e)
+                {
+                    throw new SyntaxError(line, i, null, e.Message);
                 }
             }
 
@@ -241,7 +291,7 @@ namespace UOSteam
                     node.Push(ASTNodeType.GREATER_THAN_OR_EQUAL, null);
                     break;
                 default:
-                    throw new Exception("Invalid operator in binary expression");
+                    throw new SyntaxError(node, "Invalid operator in binary expression");
             }
         }
 
@@ -261,7 +311,7 @@ namespace UOSteam
                 case "if":
                     {
                         if (lexemes.Length <= 1)
-                            throw new Exception("Script compilation error");
+                            throw new SyntaxError(node, "Script compilation error");
 
                         var t = statement.Push(ASTNodeType.IF, null);
                         ParseLogicalExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
@@ -270,7 +320,7 @@ namespace UOSteam
                 case "elseif":
                     {
                         if (lexemes.Length <= 1)
-                            throw new Exception("Script compilation error");
+                            throw new SyntaxError(node, "Script compilation error");
 
                         var t = statement.Push(ASTNodeType.ELSEIF, null);
                         ParseLogicalExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
@@ -278,14 +328,14 @@ namespace UOSteam
                     }
                 case "endif":
                     if (lexemes.Length > 1)
-                        throw new Exception("Script compilation error");
+                        throw new SyntaxError(node, "Script compilation error");
 
                     statement.Push(ASTNodeType.ENDIF, null);
                     break;
                 case "while":
                     {
                         if (lexemes.Length <= 1)
-                            throw new Exception("Script compilation error");
+                            throw new SyntaxError(node, "Script compilation error");
 
                         var t = statement.Push(ASTNodeType.WHILE, null);
                         ParseLogicalExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
@@ -293,14 +343,14 @@ namespace UOSteam
                     }
                 case "endwhile":
                     if (lexemes.Length > 1)
-                        throw new Exception("Script compilation error");
+                        throw new SyntaxError(node, "Script compilation error");
 
                     statement.Push(ASTNodeType.ENDWHILE, null);
                     break;
                 case "for":
                     {
                         if (lexemes.Length <= 1)
-                            throw new Exception("Script compilation error");
+                            throw new SyntaxError(node, "Script compilation error");
 
                         var t = statement.Push(ASTNodeType.FOR, null);
                         ParseLogicalExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
@@ -308,31 +358,31 @@ namespace UOSteam
                     }
                 case "endfor":
                     if (lexemes.Length > 1)
-                        throw new Exception("Script compilation error");
+                        throw new SyntaxError(node, "Script compilation error");
 
                     statement.Push(ASTNodeType.ENDFOR, null);
                     break;
                 case "break":
                     if (lexemes.Length > 1)
-                        throw new Exception("Script compilation error");
+                        throw new SyntaxError(node, "Script compilation error");
 
                     statement.Push(ASTNodeType.BREAK, null);
                     break;
                 case "continue":
                     if (lexemes.Length > 1)
-                        throw new Exception("Script compilation error");
+                        throw new SyntaxError(node, "Script compilation error");
 
                     statement.Push(ASTNodeType.CONTINUE, null);
                     break;
                 case "stop":
                     if (lexemes.Length > 1)
-                        throw new Exception("Script compilation error");
+                        throw new SyntaxError(node, "Script compilation error");
 
                     statement.Push(ASTNodeType.STOP, null);
                     break;
                 case "replay":
                     if (lexemes.Length > 1)
-                        throw new Exception("Script compilation error");
+                        throw new SyntaxError(node, "Script compilation error");
 
                     statement.Push(ASTNodeType.REPLAY, null);
                     break;
@@ -425,7 +475,7 @@ namespace UOSteam
                 unary = true;
 
             if (unary && binary)
-                throw new Exception("Invalid expression");
+                throw new SyntaxError(node, "Invalid expression");
 
             if (unary)
                 ParseUnaryExpression(ref node, lexemes);
