@@ -132,7 +132,10 @@ namespace UOSteam
 
             foreach (var line in lines)
             {
-                ParseLine(ref node, line);
+                foreach (var l in line.Split(';'))
+                {
+                    ParseLine(ref node, l);
+                }
             }
 
             return node;
@@ -155,7 +158,8 @@ namespace UOSteam
                     if (line == null)
                         break;
 
-                    ParseLine(ref node, line);
+                    foreach (var l in line.Split(';'))
+                        ParseLine(ref node, line);
                 }
             }
 
