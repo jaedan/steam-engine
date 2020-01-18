@@ -85,87 +85,206 @@ namespace UOSteam
             if (node == null)
                 throw new RunTimeError(_statement, "Invalid statement");
 
+            int depth = 0;
+
             switch (node.Type)
             {
                 case ASTNodeType.IF:
-                {
-                    PushScope(node);
-
-                    var expr = node.FirstChild();
-                    var result = EvaluateExpression(ref expr);
-
-                    // Advance to next statement
-                    _statement = _statement.Next();
-
-                    // The expression evaluated false, so keep advancing until
-                    // we hit an elseif or endif statement.
-                    if (!result)
                     {
+                        PushScope(node);
+
+                        var expr = node.FirstChild();
+                        var result = EvaluateExpression(ref expr);
+
+                        // Advance to next statement
+                        _statement = _statement.Next();
+
+                        // Evaluated true. Jump right into execution.
+                        if (result)
+                            break;
+
+                        // The expression evaluated false, so keep advancing until
+                        // we hit an elseif, else, or, endif statement that matches
+                        // and try again.
+                        depth = 0;
+
                         while (_statement != null)
                         {
                             node = _statement.FirstChild();
 
-                            if (node.Type == ASTNodeType.ELSEIF ||
-                                node.Type == ASTNodeType.ENDIF)
+                            if (node.Type == ASTNodeType.IF)
+                            {
+                                depth++;
+                            }
+                            else if (node.Type == ASTNodeType.ELSEIF)
+                            {
+                                if (depth > 0)
+                                {
+                                    continue;
+                                }
+
+                                expr = node.FirstChild();
+                                result = EvaluateExpression(ref expr);
+
+                                // Evaluated true. Jump right into execution
+                                if (result)
+                                {
+                                    _statement = _statement.Next();
+                                    break;
+                                }
+                            }
+                            else if (node.Type == ASTNodeType.ELSE)
+                            {
+                                if (depth > 0)
+                                {
+                                    continue;
+                                }
+
+                                // Jump into the else clause
+                                _statement = _statement.Next();
                                 break;
+                            }
+                            else if (node.Type == ASTNodeType.ENDIF)
+                            {
+                                if (depth > 0)
+                                {
+                                    depth--;
+                                    continue;
+                                }
+
+                                break;
+                            }
 
                             _statement = _statement.Next();
                         }
 
                         if (_statement == null)
                             throw new RunTimeError(node, "If with no matching endif");
+
+                        break;
                     }
-                    break;
-                }
                 case ASTNodeType.ELSEIF:
-                    PopScope();
-                    goto case ASTNodeType.IF;
-                case ASTNodeType.ENDIF:
-                    PopScope();
-                    _statement = _statement.Next();
-                    break;
-                case ASTNodeType.WHILE:
-                {
-                    PushScope(node);
-
-                    var expr = node.FirstChild();
-                    var result = EvaluateExpression(ref expr);
-
-                    // Advance to next statement
-                    _statement = _statement.Next();
-
-                    // The expression evaluated false, so keep advancing until
-                    // we hit an endwhile statement.
-                    if (!result)
-                    {
-                        while (_statement != null)
-                        {
-                            node = _statement.FirstChild();
-
-                            if (node.Type == ASTNodeType.ENDWHILE)
-                            {
-                                // Go one past the endwhile so the loop doesn't repeat
-                                PopScope();
-                                _statement = _statement.Next();
-                                break;
-                            }
-
-                            _statement = _statement.Next();
-                        }
-                    }
-                    break;
-                }
-                case ASTNodeType.ENDWHILE:
-                    // Walk backward to the while statement
-                    _statement = _statement.Prev();
+                    // If we hit the elseif statement during normal advancing, skip over it. The only way
+                    // to execute an elseif clause is to jump directly in from an if statement.
+                    depth = 0;
 
                     while (_statement != null)
                     {
                         node = _statement.FirstChild();
 
-                        if (node.Type == ASTNodeType.WHILE)
+                        if (node.Type == ASTNodeType.IF)
                         {
-                            break;
+                            depth++;
+                        }
+                        else if (node.Type == ASTNodeType.ENDIF)
+                        {
+                            if (depth == 0)
+                                break;
+
+                            depth--;
+                        }
+
+                        _statement = _statement.Next();
+                    }
+
+                    if (_statement == null)
+                        throw new RunTimeError(node, "If with no matching endif");
+
+                    break;
+                case ASTNodeType.ENDIF:
+                    PopScope();
+                    _statement = _statement.Next();
+                    break;
+                case ASTNodeType.ELSE:
+                    // If we hit the else statement during normal advancing, skip over it. The only way
+                    // to execute an else clause is to jump directly in from an if statement.
+                    depth = 0;
+
+                    while (_statement != null)
+                    {
+                        node = _statement.FirstChild();
+
+                        if (node.Type == ASTNodeType.IF)
+                        {
+                            depth++;
+                        }
+                        else if (node.Type == ASTNodeType.ENDIF)
+                        {
+                            if (depth == 0)
+                                break;
+
+                            depth--;
+                        }
+
+                        _statement = _statement.Next();
+                    }
+
+                    if (_statement == null)
+                        throw new RunTimeError(node, "If with no matching endif");
+
+                    break;
+                case ASTNodeType.WHILE:
+                    {
+                        PushScope(node);
+
+                        var expr = node.FirstChild();
+                        var result = EvaluateExpression(ref expr);
+
+                        // Advance to next statement
+                        _statement = _statement.Next();
+
+                        // The expression evaluated false, so keep advancing until
+                        // we hit an endwhile statement.
+                        if (!result)
+                        {
+                            depth = 0;
+
+                            while (_statement != null)
+                            {
+                                node = _statement.FirstChild();
+
+                                if (node.Type == ASTNodeType.WHILE)
+                                {
+                                    depth++;
+                                }
+                                else if (node.Type == ASTNodeType.ENDWHILE)
+                                {
+                                    if (depth == 0)
+                                    {
+                                        PopScope();
+                                        // Go one past the endwhile so the loop doesn't repeat
+                                        _statement = _statement.Next();
+                                        break;
+                                    }
+
+                                    depth--;
+                                }
+
+                                _statement = _statement.Next();
+                            }
+                        }
+                        break;
+                    }
+                case ASTNodeType.ENDWHILE:
+                    // Walk backward to the while statement
+                    _statement = _statement.Prev();
+
+                    depth = 0;
+
+                    while (_statement != null)
+                    {
+                        node = _statement.FirstChild();
+
+                        if (node.Type == ASTNodeType.ENDWHILE)
+                        {
+                            depth++;
+                        }
+                        else if (node.Type == ASTNodeType.WHILE)
+                        {
+                            if (depth == 0)
+                                break;
+
+                            depth--;
                         }
 
                         _statement = _statement.Prev();
@@ -205,17 +324,30 @@ namespace UOSteam
                     // Walk until the end of the loop
                     _statement = _statement.Next();
 
+                    depth = 0;
+
                     while (_statement != null)
                     {
                         node = _statement.FirstChild();
 
-                        if (node.Type == ASTNodeType.ENDWHILE ||
+                        if (node.Type == ASTNodeType.WHILE ||
+                            node.Type == ASTNodeType.FOR)
+                        {
+                            depth++;
+                        }
+                        else if (node.Type == ASTNodeType.ENDWHILE ||
                             node.Type == ASTNodeType.ENDFOR)
                         {
-                            // Go one past the end so the loop doesn't repeat
-                            PopScope();
-                            _statement = _statement.Next();
-                            break;
+                            if (depth == 0)
+                            {
+                                PopScope();
+
+                                // Go one past the end so the loop doesn't repeat
+                                _statement = _statement.Next();
+                                break;
+                            }
+
+                            depth--;
                         }
 
                         _statement = _statement.Next();
@@ -227,14 +359,24 @@ namespace UOSteam
                     // Walk backward to the loop statement
                     _statement = _statement.Prev();
 
+                    depth = 0;
+
                     while (_statement != null)
                     {
                         node = _statement.FirstChild();
 
-                        if (node.Type == ASTNodeType.WHILE ||
+                        if (node.Type == ASTNodeType.ENDWHILE ||
+                            node.Type == ASTNodeType.ENDFOR)
+                        {
+                            depth++;
+                        }
+                        else if (node.Type == ASTNodeType.WHILE ||
                             node.Type == ASTNodeType.FOR)
                         {
-                            break;
+                            if (depth == 0)
+                                break;
+
+                            depth--;
                         }
 
                         _statement = _statement.Prev();
@@ -257,7 +399,7 @@ namespace UOSteam
                     break;
             }
 
-            return (_statement != null) ? true: false;
+            return (_statement != null) ? true : false;
         }
 
         private ASTNode EvaluateModifiers(ASTNode node, out bool quiet, out bool force, out bool not)
@@ -366,7 +508,7 @@ namespace UOSteam
                 node = node.Next();
             }
 
-            return lhs; 
+            return lhs;
         }
 
         private bool EvaluateUnaryExpression(ref ASTNode node)

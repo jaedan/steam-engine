@@ -31,6 +31,7 @@ namespace UOSteam
         // Keywords
         IF,
         ELSEIF,
+        ELSE,
         ENDIF,
         WHILE,
         ENDWHILE,
@@ -326,6 +327,12 @@ namespace UOSteam
                         ParseLogicalExpression(ref t, lexemes.Slice(1, lexemes.Length - 1));
                         break;
                     }
+                case "else":
+                    if (lexemes.Length > 1)
+                        throw new SyntaxError(node, "Script compilation error");
+
+                    statement.Push(ASTNodeType.ELSE, null);
+                    break;
                 case "endif":
                     if (lexemes.Length > 1)
                         throw new SyntaxError(node, "Script compilation error");
