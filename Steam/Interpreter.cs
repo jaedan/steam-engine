@@ -3,6 +3,16 @@ using System.Collections.Generic;
 
 namespace UOSteam
 {
+    public class RunTimeError : Exception
+    {
+        public ASTNode Node;
+
+        public RunTimeError(ASTNode node, string error) : base(error)
+        {
+            Node = node;
+        }
+    }
+
     public class Script
     {
         private ASTNode _statement;
@@ -28,12 +38,12 @@ namespace UOSteam
                 return false;
 
             if (_statement.Type != ASTNodeType.STATEMENT)
-                throw new Exception("Invalid script");
+                throw new RunTimeError(_statement, "Invalid script");
 
             var node = _statement.FirstChild();
 
             if (node == null)
-                throw new Exception("Invalid statement");
+                throw new RunTimeError(_statement, "Invalid statement");
 
             switch (node.Type)
             {
@@ -62,7 +72,7 @@ namespace UOSteam
                         }
 
                         if (_statement == null)
-                            throw new Exception("If with no matching endif");
+                            throw new RunTimeError(node, "If with no matching endif");
                     }
                     break;
                 }
@@ -114,10 +124,10 @@ namespace UOSteam
                     }
 
                     if (_statement == null)
-                        throw new Exception("Unexpected endwhile");
+                        throw new RunTimeError(node, "Unexpected endwhile");
                     break;
                 case ASTNodeType.FOR:
-                    throw new Exception("For loops are not supported yet");
+                    throw new RunTimeError(node, "For loops are not supported yet");
                 case ASTNodeType.ENDFOR:
                     // Walk backward to the for statement
                     _statement = _statement.Prev();
@@ -135,7 +145,7 @@ namespace UOSteam
                     }
 
                     if (_statement == null)
-                        throw new Exception("Unexpected endfor");
+                        throw new RunTimeError(node, "Unexpected endfor");
                     break;
                 case ASTNodeType.BREAK:
                     // Walk until the end of the loop
@@ -174,7 +184,7 @@ namespace UOSteam
                     }
 
                     if (_statement == null)
-                        throw new Exception("Unexpected continue");
+                        throw new RunTimeError(node, "Unexpected continue");
                     break;
                 case ASTNodeType.STOP:
                     _statement = null;
@@ -227,12 +237,12 @@ namespace UOSteam
             var handler = Interpreter.GetCommandHandler(node.Lexeme);
 
             if (handler == null)
-                throw new Exception("Unknown command");
+                throw new RunTimeError(node, "Unknown command");
 
             var cont = handler(ref node, quiet, force);
 
             if (node != null)
-                throw new Exception("Command did not consume all available arguments");
+                throw new RunTimeError(node, "Command did not consume all available arguments");
 
             return cont;
         }
@@ -240,12 +250,12 @@ namespace UOSteam
         private bool EvaluateExpression(ref ASTNode expr)
         {
             if (expr == null || (expr.Type != ASTNodeType.UNARY_EXPRESSION && expr.Type != ASTNodeType.BINARY_EXPRESSION && expr.Type != ASTNodeType.LOGICAL_EXPRESSION))
-                throw new Exception("No expression following control statement");
+                throw new RunTimeError(expr, "No expression following control statement");
 
             var node = expr.FirstChild();
 
             if (node == null)
-                throw new Exception("Empty expression following control statement");
+                throw new RunTimeError(expr, "Empty expression following control statement");
 
             switch (expr.Type)
             {
@@ -266,7 +276,7 @@ namespace UOSteam
                 node = node.Next();
 
                 if (node == null)
-                    throw new Exception("Invalid logical expression");
+                    throw new RunTimeError(node, "Invalid logical expression");
 
                 bool rhs;
 
@@ -281,7 +291,7 @@ namespace UOSteam
                         rhs = EvaluateBinaryExpression(ref e);
                         break;
                     default:
-                        throw new Exception("Nested logical expressions are not possible");
+                        throw new RunTimeError(node, "Nested logical expressions are not possible");
                 }
 
                 switch (op)
@@ -293,7 +303,7 @@ namespace UOSteam
                         lhs = lhs || rhs;
                         break;
                     default:
-                        throw new Exception("Invalid logical operator");
+                        throw new RunTimeError(node, "Invalid logical operator");
                 }
 
                 node = node.Next();
@@ -360,7 +370,7 @@ namespace UOSteam
                     return lhs >= rhs;
             }
 
-            throw new Exception("Invalid operator type in expression");
+            throw new RunTimeError(node, "Invalid operator type in expression");
         }
 
         private int ExecuteExpression(ref ASTNode node, bool quiet)
@@ -368,7 +378,7 @@ namespace UOSteam
             var handler = Interpreter.GetExpressionHandler(node.Lexeme);
 
             if (handler == null)
-                throw new Exception("Unknown expression");
+                throw new RunTimeError(node, "Unknown expression");
 
             var result = handler(ref node, quiet);
 
