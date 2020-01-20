@@ -1,14 +1,164 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace UOSteam
 {
+    public class RunTimeError : Exception
+    {
+        public ASTNode Node;
+
+        public RunTimeError(ASTNode node, string error) : base(error)
+        {
+            Node = node;
+        }
+    }
+
+    internal class Scope
+    {
+        public Dictionary<string, object> Namespace = new Dictionary<string, object>();
+
+        public readonly ASTNode StartNode;
+        public readonly Scope Parent;
+
+        public Scope(Scope parent, ASTNode start)
+        {
+            Parent = parent;
+            StartNode = start;
+        }
+    }
+
+    public class Argument
+    {
+        private ASTNode _node;
+
+        public Argument(ASTNode node)
+        {
+            _node = node;
+        }
+
+        // Treat the argument as an integer
+        public int AsInt()
+        {
+            if (_node.Lexeme == null)
+                throw new RunTimeError(_node, "Cannot convert argument to int");
+
+            int val;
+
+            if (_node.Lexeme.StartsWith("0x"))
+            {
+                if (int.TryParse(_node.Lexeme.Substring(2), NumberStyles.HexNumber, Interpreter.Culture, out val))
+                    return val;
+            }
+            else if (int.TryParse(_node.Lexeme, out val))
+                return val;
+
+            throw new RunTimeError(_node, "Cannot convert argument to int");
+        }
+
+        // Treat the argument as an unsigned integer
+        public uint AsUInt()
+        {
+            if (_node.Lexeme == null)
+                throw new RunTimeError(_node, "Cannot convert argument to uint");
+
+            uint val;
+
+            if (_node.Lexeme.StartsWith("0x"))
+            {
+                if (uint.TryParse(_node.Lexeme.Substring(2), NumberStyles.HexNumber, Interpreter.Culture, out val))
+                    return val;
+            }
+            else if (uint.TryParse(_node.Lexeme, out val))
+                return val;
+
+            throw new RunTimeError(_node, "Cannot convert argument to uint");
+        }
+
+        // Treat the argument as a serial or an alias. Aliases will
+        // be automatically resolved to serial numbers.
+        public uint AsSerial()
+        {
+            if (_node.Lexeme == null)
+                throw new RunTimeError(_node, "Cannot convert argument to serial");
+
+            // Resolving aliases takes precedence
+            uint serial = Interpreter.GetAlias(_node.Lexeme);
+
+            if (serial != uint.MaxValue)
+                return serial;
+
+            return AsUInt();
+        }
+
+        // Treat the argument as a string
+        public string AsString()
+        {
+            if (_node.Lexeme == null)
+                throw new RunTimeError(_node, "Cannot convert argument to string");
+
+            return _node.Lexeme;
+        }
+    }
+
     public class Script
     {
         private ASTNode _statement;
 
-        // For-loop indices
-        private Dictionary<ASTNode, int> _forloops = new Dictionary<ASTNode, int>();
+        private Scope _scope;
+
+        private object Lookup(string name)
+        {
+            var scope = _scope;
+            object result = null;
+
+            while (scope != null)
+            {
+                if (scope.Namespace.TryGetValue(name, out result))
+                    return result;
+            }
+
+            return result;
+        }
+
+        private void PushScope(ASTNode node)
+        {
+            _scope = new Scope(_scope, node);
+        }
+
+        private void PopScope()
+        {
+            _scope = _scope.Parent;
+        }
+
+        private Argument[] ConstructArguments(ref ASTNode node)
+        {
+            List<Argument> args = new List<Argument>();
+
+            node = node.Next();
+
+            while (node != null)
+            {
+                switch (node.Type)
+                {
+                    case ASTNodeType.AND:
+                    case ASTNodeType.OR:
+                    case ASTNodeType.EQUAL:
+                    case ASTNodeType.NOT_EQUAL:
+                    case ASTNodeType.LESS_THAN:
+                    case ASTNodeType.LESS_THAN_OR_EQUAL:
+                    case ASTNodeType.GREATER_THAN:
+                    case ASTNodeType.GREATER_THAN_OR_EQUAL:
+                        return args.ToArray();
+                }
+
+                args.Add(new Argument(node));
+
+                node = node.Next();
+            }
+
+            return args.ToArray();
+        }
 
         // For now, the scripts execute directly from the
         // abstract syntax tree. This is relatively simple.
@@ -20,6 +170,9 @@ namespace UOSteam
         {
             // Set current to the first statement
             _statement = root.FirstChild();
+
+            // Create a default scope
+            _scope = new Scope(null, _statement);
         }
 
         public bool ExecuteNext()
@@ -28,96 +181,228 @@ namespace UOSteam
                 return false;
 
             if (_statement.Type != ASTNodeType.STATEMENT)
-                throw new Exception("Invalid script");
+                throw new RunTimeError(_statement, "Invalid script");
 
             var node = _statement.FirstChild();
 
             if (node == null)
-                throw new Exception("Invalid statement");
+                throw new RunTimeError(_statement, "Invalid statement");
+
+            int depth = 0;
 
             switch (node.Type)
             {
                 case ASTNodeType.IF:
-                case ASTNodeType.ELSEIF:
-                {
-                    var expr = node.FirstChild();
-                    var result = EvaluateExpression(ref expr);
-
-                    // Advance to next statement
-                    _statement = _statement.Next();
-
-                    // The expression evaluated false, so keep advancing until
-                    // we hit an elseif or endif statement.
-                    if (!result)
                     {
+                        PushScope(node);
+
+                        var expr = node.FirstChild();
+                        var result = EvaluateExpression(ref expr);
+
+                        // Advance to next statement
+                        _statement = _statement.Next();
+
+                        // Evaluated true. Jump right into execution.
+                        if (result)
+                            break;
+
+                        // The expression evaluated false, so keep advancing until
+                        // we hit an elseif, else, or, endif statement that matches
+                        // and try again.
+                        depth = 0;
+
                         while (_statement != null)
                         {
                             node = _statement.FirstChild();
 
-                            if (node.Type == ASTNodeType.ELSEIF ||
-                                node.Type == ASTNodeType.ENDIF)
-                                break;
-
-                            _statement = _statement.Next();
-                        }
-
-                        if (_statement == null)
-                            throw new Exception("If with no matching endif");
-                    }
-                    break;
-                }
-                case ASTNodeType.ENDIF:
-                    _statement = _statement.Next();
-                    break;
-                case ASTNodeType.WHILE:
-                {
-                    var expr = node.FirstChild();
-                    var result = EvaluateExpression(ref expr);
-
-                    // Advance to next statement
-                    _statement = _statement.Next();
-
-                    // The expression evaluated false, so keep advancing until
-                    // we hit an endwhile statement.
-                    if (!result)
-                    {
-                        while (_statement != null)
-                        {
-                            node = _statement.FirstChild();
-
-                            if (node.Type == ASTNodeType.ENDWHILE)
+                            if (node.Type == ASTNodeType.IF)
                             {
-                                // Go one past the endwhile so the loop doesn't repeat
+                                depth++;
+                            }
+                            else if (node.Type == ASTNodeType.ELSEIF)
+                            {
+                                if (depth > 0)
+                                {
+                                    continue;
+                                }
+
+                                expr = node.FirstChild();
+                                result = EvaluateExpression(ref expr);
+
+                                // Evaluated true. Jump right into execution
+                                if (result)
+                                {
+                                    _statement = _statement.Next();
+                                    break;
+                                }
+                            }
+                            else if (node.Type == ASTNodeType.ELSE)
+                            {
+                                if (depth > 0)
+                                {
+                                    continue;
+                                }
+
+                                // Jump into the else clause
                                 _statement = _statement.Next();
+                                break;
+                            }
+                            else if (node.Type == ASTNodeType.ENDIF)
+                            {
+                                if (depth > 0)
+                                {
+                                    depth--;
+                                    continue;
+                                }
+
                                 break;
                             }
 
                             _statement = _statement.Next();
                         }
+
+                        if (_statement == null)
+                            throw new RunTimeError(node, "If with no matching endif");
+
+                        break;
                     }
-                    break;
-                }
-                case ASTNodeType.ENDWHILE:
-                    // Walk backward to the while statement
-                    _statement = _statement.Prev();
+                case ASTNodeType.ELSEIF:
+                    // If we hit the elseif statement during normal advancing, skip over it. The only way
+                    // to execute an elseif clause is to jump directly in from an if statement.
+                    depth = 0;
 
                     while (_statement != null)
                     {
                         node = _statement.FirstChild();
 
-                        if (node.Type == ASTNodeType.WHILE)
+                        if (node.Type == ASTNodeType.IF)
                         {
-                            break;
+                            depth++;
+                        }
+                        else if (node.Type == ASTNodeType.ENDIF)
+                        {
+                            if (depth == 0)
+                                break;
+
+                            depth--;
+                        }
+
+                        _statement = _statement.Next();
+                    }
+
+                    if (_statement == null)
+                        throw new RunTimeError(node, "If with no matching endif");
+
+                    break;
+                case ASTNodeType.ENDIF:
+                    PopScope();
+                    _statement = _statement.Next();
+                    break;
+                case ASTNodeType.ELSE:
+                    // If we hit the else statement during normal advancing, skip over it. The only way
+                    // to execute an else clause is to jump directly in from an if statement.
+                    depth = 0;
+
+                    while (_statement != null)
+                    {
+                        node = _statement.FirstChild();
+
+                        if (node.Type == ASTNodeType.IF)
+                        {
+                            depth++;
+                        }
+                        else if (node.Type == ASTNodeType.ENDIF)
+                        {
+                            if (depth == 0)
+                                break;
+
+                            depth--;
+                        }
+
+                        _statement = _statement.Next();
+                    }
+
+                    if (_statement == null)
+                        throw new RunTimeError(node, "If with no matching endif");
+
+                    break;
+                case ASTNodeType.WHILE:
+                    {
+                        PushScope(node);
+
+                        var expr = node.FirstChild();
+                        var result = EvaluateExpression(ref expr);
+
+                        // Advance to next statement
+                        _statement = _statement.Next();
+
+                        // The expression evaluated false, so keep advancing until
+                        // we hit an endwhile statement.
+                        if (!result)
+                        {
+                            depth = 0;
+
+                            while (_statement != null)
+                            {
+                                node = _statement.FirstChild();
+
+                                if (node.Type == ASTNodeType.WHILE)
+                                {
+                                    depth++;
+                                }
+                                else if (node.Type == ASTNodeType.ENDWHILE)
+                                {
+                                    if (depth == 0)
+                                    {
+                                        PopScope();
+                                        // Go one past the endwhile so the loop doesn't repeat
+                                        _statement = _statement.Next();
+                                        break;
+                                    }
+
+                                    depth--;
+                                }
+
+                                _statement = _statement.Next();
+                            }
+                        }
+                        break;
+                    }
+                case ASTNodeType.ENDWHILE:
+                    // Walk backward to the while statement
+                    _statement = _statement.Prev();
+
+                    depth = 0;
+
+                    while (_statement != null)
+                    {
+                        node = _statement.FirstChild();
+
+                        if (node.Type == ASTNodeType.ENDWHILE)
+                        {
+                            depth++;
+                        }
+                        else if (node.Type == ASTNodeType.WHILE)
+                        {
+                            if (depth == 0)
+                                break;
+
+                            depth--;
                         }
 
                         _statement = _statement.Prev();
                     }
 
                     if (_statement == null)
-                        throw new Exception("Unexpected endwhile");
+                        throw new RunTimeError(node, "Unexpected endwhile");
+
+                    PopScope();
+
                     break;
                 case ASTNodeType.FOR:
-                    throw new Exception("For loops are not supported yet");
+                case ASTNodeType.FOREACH:
+                    PushScope(node);
+                    throw new RunTimeError(node, "For loops are not supported yet");
                 case ASTNodeType.ENDFOR:
                     // Walk backward to the for statement
                     _statement = _statement.Prev();
@@ -126,7 +411,8 @@ namespace UOSteam
                     {
                         node = _statement.FirstChild();
 
-                        if (node.Type == ASTNodeType.FOR)
+                        if (node.Type == ASTNodeType.FOR ||
+                            node.Type == ASTNodeType.FOREACH)
                         {
                             break;
                         }
@@ -135,11 +421,51 @@ namespace UOSteam
                     }
 
                     if (_statement == null)
-                        throw new Exception("Unexpected endfor");
+                        throw new RunTimeError(node, "Unexpected endfor");
+
+                    PopScope();
                     break;
                 case ASTNodeType.BREAK:
                     // Walk until the end of the loop
                     _statement = _statement.Next();
+
+                    depth = 0;
+
+                    while (_statement != null)
+                    {
+                        node = _statement.FirstChild();
+
+                        if (node.Type == ASTNodeType.WHILE ||
+                            node.Type == ASTNodeType.FOR ||
+                            node.Type == ASTNodeType.FOREACH)
+                        {
+                            depth++;
+                        }
+                        else if (node.Type == ASTNodeType.ENDWHILE ||
+                            node.Type == ASTNodeType.ENDFOR)
+                        {
+                            if (depth == 0)
+                            {
+                                PopScope();
+
+                                // Go one past the end so the loop doesn't repeat
+                                _statement = _statement.Next();
+                                break;
+                            }
+
+                            depth--;
+                        }
+
+                        _statement = _statement.Next();
+                    }
+
+                    PopScope();
+                    break;
+                case ASTNodeType.CONTINUE:
+                    // Walk backward to the loop statement
+                    _statement = _statement.Prev();
+
+                    depth = 0;
 
                     while (_statement != null)
                     {
@@ -148,33 +474,23 @@ namespace UOSteam
                         if (node.Type == ASTNodeType.ENDWHILE ||
                             node.Type == ASTNodeType.ENDFOR)
                         {
-                            // Go one past the end so the loop doesn't repeat
-                            _statement = _statement.Next();
-                            break;
+                            depth++;
                         }
-
-                        _statement = _statement.Next();
-                    }
-                    break;
-                case ASTNodeType.CONTINUE:
-                    // Walk backward to the loop statement
-                    _statement = _statement.Prev();
-
-                    while (_statement != null)
-                    {
-                        node = _statement.FirstChild();
-
-                        if (node.Type == ASTNodeType.WHILE ||
-                            node.Type == ASTNodeType.FOR)
+                        else if (node.Type == ASTNodeType.WHILE ||
+                                 node.Type == ASTNodeType.FOR ||
+                                 node.Type == ASTNodeType.FOREACH)
                         {
-                            break;
+                            if (depth == 0)
+                                break;
+
+                            depth--;
                         }
 
                         _statement = _statement.Prev();
                     }
 
                     if (_statement == null)
-                        throw new Exception("Unexpected continue");
+                        throw new RunTimeError(node, "Unexpected continue");
                     break;
                 case ASTNodeType.STOP:
                     _statement = null;
@@ -190,7 +506,7 @@ namespace UOSteam
                     break;
             }
 
-            return (_statement != null) ? true: false;
+            return (_statement != null) ? true : false;
         }
 
         private ASTNode EvaluateModifiers(ASTNode node, out bool quiet, out bool force, out bool not)
@@ -227,12 +543,12 @@ namespace UOSteam
             var handler = Interpreter.GetCommandHandler(node.Lexeme);
 
             if (handler == null)
-                throw new Exception("Unknown command");
+                throw new RunTimeError(node, "Unknown command");
 
-            var cont = handler(ref node, quiet, force);
+            var cont = handler(node.Lexeme, ConstructArguments(ref node), quiet, force);
 
             if (node != null)
-                throw new Exception("Command did not consume all available arguments");
+                throw new RunTimeError(node, "Command did not consume all available arguments");
 
             return cont;
         }
@@ -240,12 +556,12 @@ namespace UOSteam
         private bool EvaluateExpression(ref ASTNode expr)
         {
             if (expr == null || (expr.Type != ASTNodeType.UNARY_EXPRESSION && expr.Type != ASTNodeType.BINARY_EXPRESSION && expr.Type != ASTNodeType.LOGICAL_EXPRESSION))
-                throw new Exception("No expression following control statement");
+                throw new RunTimeError(expr, "No expression following control statement");
 
             var node = expr.FirstChild();
 
             if (node == null)
-                throw new Exception("Empty expression following control statement");
+                throw new RunTimeError(expr, "Empty expression following control statement");
 
             switch (expr.Type)
             {
@@ -266,7 +582,7 @@ namespace UOSteam
                 node = node.Next();
 
                 if (node == null)
-                    throw new Exception("Invalid logical expression");
+                    throw new RunTimeError(node, "Invalid logical expression");
 
                 bool rhs;
 
@@ -281,7 +597,7 @@ namespace UOSteam
                         rhs = EvaluateBinaryExpression(ref e);
                         break;
                     default:
-                        throw new Exception("Nested logical expressions are not possible");
+                        throw new RunTimeError(node, "Nested logical expressions are not possible");
                 }
 
                 switch (op)
@@ -293,13 +609,13 @@ namespace UOSteam
                         lhs = lhs || rhs;
                         break;
                     default:
-                        throw new Exception("Invalid logical operator");
+                        throw new RunTimeError(node, "Invalid logical operator");
                 }
 
                 node = node.Next();
             }
 
-            return lhs; 
+            return lhs;
         }
 
         private bool EvaluateUnaryExpression(ref ASTNode node)
@@ -360,7 +676,7 @@ namespace UOSteam
                     return lhs >= rhs;
             }
 
-            throw new Exception("Invalid operator type in expression");
+            throw new RunTimeError(node, "Invalid operator type in expression");
         }
 
         private int ExecuteExpression(ref ASTNode node, bool quiet)
@@ -368,9 +684,9 @@ namespace UOSteam
             var handler = Interpreter.GetExpressionHandler(node.Lexeme);
 
             if (handler == null)
-                throw new Exception("Unknown expression");
+                throw new RunTimeError(node, "Unknown expression");
 
-            var result = handler(ref node, quiet);
+            var result = handler(node.Lexeme, ConstructArguments(ref node), quiet);
 
             return result;
         }
@@ -379,24 +695,33 @@ namespace UOSteam
     public static class Interpreter
     {
         // Aliases only hold serial numbers
-        private static Dictionary<string, int> _aliases = new Dictionary<string, int>();
+        private static Dictionary<string, uint> _aliases = new Dictionary<string, uint>();
 
         // Lists
         private static Dictionary<string, object[]> _lists = new Dictionary<string, object[]>();
 
-        public delegate int ExpressionHandler(ref ASTNode node, bool quiet);
+        public delegate int ExpressionHandler(string expression, Argument[] args, bool quiet);
 
         private static Dictionary<string, ExpressionHandler> _exprHandlers = new Dictionary<string, ExpressionHandler>();
 
-        public delegate bool CommandHandler(ref ASTNode node, bool quiet, bool force);
+        public delegate bool CommandHandler(string command, Argument[] args, bool quiet, bool force);
 
         private static Dictionary<string, CommandHandler> _commandHandlers = new Dictionary<string, CommandHandler>();
 
-        public delegate int AliasHandler(ref ASTNode node);
+        public delegate uint AliasHandler(string alias);
 
         private static Dictionary<string, AliasHandler> _aliasHandlers = new Dictionary<string, AliasHandler>();
 
         private static LinkedList<Script> _scripts = new LinkedList<Script>();
+
+        public static CultureInfo Culture;
+
+        static Interpreter()
+        {
+            Culture = new CultureInfo("en-EN", false);
+            Culture.NumberFormat.NumberDecimalSeparator = ".";
+            Culture.NumberFormat.NumberGroupSeparator = ",";
+        }
 
         public static void RegisterExpressionHandler(string keyword, ExpressionHandler handler)
         {
@@ -427,20 +752,20 @@ namespace UOSteam
             _aliasHandlers[keyword] = handler;
         }
 
-        public static int GetAlias(ref ASTNode node)
+        public static uint GetAlias(string alias)
         {
             // If a handler is explicitly registered, call that.
-            if (_aliasHandlers.TryGetValue(node.Lexeme, out AliasHandler handler))
-                return handler(ref node);
+            if (_aliasHandlers.TryGetValue(alias, out AliasHandler handler))
+                return handler(alias);
 
-            int value;
-            if (_aliases.TryGetValue(node.Lexeme, out value))
+            uint value;
+            if (_aliases.TryGetValue(alias, out value))
                 return value;
 
-            return -1;
+            return uint.MaxValue;
         }
 
-        public static void SetAlias(string alias, int serial)
+        public static void SetAlias(string alias, uint serial)
         {
             _aliases[alias] = serial;
         }
