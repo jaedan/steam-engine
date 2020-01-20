@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace UOSteam
 {
@@ -24,6 +25,79 @@ namespace UOSteam
         {
             Parent = parent;
             StartNode = start;
+        }
+    }
+
+    public class Argument
+    {
+        private ASTNode _node;
+
+        public Argument(ASTNode node)
+        {
+            _node = node;
+        }
+
+        // Treat the argument as an integer
+        public int AsInt()
+        {
+            if (_node.Lexeme == null)
+                throw new RunTimeError(_node, "Cannot convert argument to int");
+
+            int val;
+
+            if (_node.Lexeme.StartsWith("0x"))
+            {
+                if (int.TryParse(_node.Lexeme.Substring(2), NumberStyles.HexNumber, Interpreter.Culture, out val))
+                    return val;
+            }
+            else if (int.TryParse(_node.Lexeme, out val))
+                return val;
+
+            throw new RunTimeError(_node, "Cannot convert argument to int");
+        }
+
+        // Treat the argument as an unsigned integer
+        public uint AsUInt()
+        {
+            if (_node.Lexeme == null)
+                throw new RunTimeError(_node, "Cannot convert argument to uint");
+
+            uint val;
+
+            if (_node.Lexeme.StartsWith("0x"))
+            {
+                if (uint.TryParse(_node.Lexeme.Substring(2), NumberStyles.HexNumber, Interpreter.Culture, out val))
+                    return val;
+            }
+            else if (uint.TryParse(_node.Lexeme, out val))
+                return val;
+
+            throw new RunTimeError(_node, "Cannot convert argument to uint");
+        }
+
+        // Treat the argument as a serial or an alias. Aliases will
+        // be automatically resolved to serial numbers.
+        public uint AsSerial()
+        {
+            if (_node.Lexeme == null)
+                throw new RunTimeError(_node, "Cannot convert argument to serial");
+
+            // Resolving aliases takes precedence
+            uint serial = Interpreter.GetAlias(_node.Lexeme);
+
+            if (serial != uint.MaxValue)
+                return serial;
+
+            return AsUInt();
+        }
+
+        // Treat the argument as a string
+        public string AsString()
+        {
+            if (_node.Lexeme == null)
+                throw new RunTimeError(_node, "Cannot convert argument to string");
+
+            return _node.Lexeme;
         }
     }
 
@@ -55,6 +129,35 @@ namespace UOSteam
         private void PopScope()
         {
             _scope = _scope.Parent;
+        }
+
+        private Argument[] ConstructArguments(ref ASTNode node)
+        {
+            List<Argument> args = new List<Argument>();
+
+            node = node.Next();
+
+            while (node != null)
+            {
+                switch (node.Type)
+                {
+                    case ASTNodeType.AND:
+                    case ASTNodeType.OR:
+                    case ASTNodeType.EQUAL:
+                    case ASTNodeType.NOT_EQUAL:
+                    case ASTNodeType.LESS_THAN:
+                    case ASTNodeType.LESS_THAN_OR_EQUAL:
+                    case ASTNodeType.GREATER_THAN:
+                    case ASTNodeType.GREATER_THAN_OR_EQUAL:
+                        return args.ToArray();
+                }
+
+                args.Add(new Argument(node));
+
+                node = node.Next();
+            }
+
+            return args.ToArray();
         }
 
         // For now, the scripts execute directly from the
@@ -442,7 +545,7 @@ namespace UOSteam
             if (handler == null)
                 throw new RunTimeError(node, "Unknown command");
 
-            var cont = handler(ref node, quiet, force);
+            var cont = handler(node.Lexeme, ConstructArguments(ref node), quiet, force);
 
             if (node != null)
                 throw new RunTimeError(node, "Command did not consume all available arguments");
@@ -583,7 +686,7 @@ namespace UOSteam
             if (handler == null)
                 throw new RunTimeError(node, "Unknown expression");
 
-            var result = handler(ref node, quiet);
+            var result = handler(node.Lexeme, ConstructArguments(ref node), quiet);
 
             return result;
         }
@@ -592,24 +695,33 @@ namespace UOSteam
     public static class Interpreter
     {
         // Aliases only hold serial numbers
-        private static Dictionary<string, int> _aliases = new Dictionary<string, int>();
+        private static Dictionary<string, uint> _aliases = new Dictionary<string, uint>();
 
         // Lists
         private static Dictionary<string, object[]> _lists = new Dictionary<string, object[]>();
 
-        public delegate int ExpressionHandler(ref ASTNode node, bool quiet);
+        public delegate int ExpressionHandler(string expression, Argument[] args, bool quiet);
 
         private static Dictionary<string, ExpressionHandler> _exprHandlers = new Dictionary<string, ExpressionHandler>();
 
-        public delegate bool CommandHandler(ref ASTNode node, bool quiet, bool force);
+        public delegate bool CommandHandler(string command, Argument[] args, bool quiet, bool force);
 
         private static Dictionary<string, CommandHandler> _commandHandlers = new Dictionary<string, CommandHandler>();
 
-        public delegate int AliasHandler(ref ASTNode node);
+        public delegate uint AliasHandler(string alias);
 
         private static Dictionary<string, AliasHandler> _aliasHandlers = new Dictionary<string, AliasHandler>();
 
         private static LinkedList<Script> _scripts = new LinkedList<Script>();
+
+        public static CultureInfo Culture;
+
+        static Interpreter()
+        {
+            Culture = new CultureInfo("en-EN", false);
+            Culture.NumberFormat.NumberDecimalSeparator = ".";
+            Culture.NumberFormat.NumberGroupSeparator = ",";
+        }
 
         public static void RegisterExpressionHandler(string keyword, ExpressionHandler handler)
         {
@@ -640,20 +752,20 @@ namespace UOSteam
             _aliasHandlers[keyword] = handler;
         }
 
-        public static int GetAlias(ref ASTNode node)
+        public static uint GetAlias(string alias)
         {
             // If a handler is explicitly registered, call that.
-            if (_aliasHandlers.TryGetValue(node.Lexeme, out AliasHandler handler))
-                return handler(ref node);
+            if (_aliasHandlers.TryGetValue(alias, out AliasHandler handler))
+                return handler(alias);
 
-            int value;
-            if (_aliases.TryGetValue(node.Lexeme, out value))
+            uint value;
+            if (_aliases.TryGetValue(alias, out value))
                 return value;
 
-            return -1;
+            return uint.MaxValue;
         }
 
-        public static void SetAlias(string alias, int serial)
+        public static void SetAlias(string alias, uint serial)
         {
             _aliases[alias] = serial;
         }
