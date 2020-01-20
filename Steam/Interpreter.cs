@@ -297,6 +297,7 @@ namespace UOSteam
 
                     break;
                 case ASTNodeType.FOR:
+                case ASTNodeType.FOREACH:
                     PushScope(node);
                     throw new RunTimeError(node, "For loops are not supported yet");
                 case ASTNodeType.ENDFOR:
@@ -307,7 +308,8 @@ namespace UOSteam
                     {
                         node = _statement.FirstChild();
 
-                        if (node.Type == ASTNodeType.FOR)
+                        if (node.Type == ASTNodeType.FOR ||
+                            node.Type == ASTNodeType.FOREACH)
                         {
                             break;
                         }
@@ -331,7 +333,8 @@ namespace UOSteam
                         node = _statement.FirstChild();
 
                         if (node.Type == ASTNodeType.WHILE ||
-                            node.Type == ASTNodeType.FOR)
+                            node.Type == ASTNodeType.FOR ||
+                            node.Type == ASTNodeType.FOREACH)
                         {
                             depth++;
                         }
@@ -371,7 +374,8 @@ namespace UOSteam
                             depth++;
                         }
                         else if (node.Type == ASTNodeType.WHILE ||
-                            node.Type == ASTNodeType.FOR)
+                                 node.Type == ASTNodeType.FOR ||
+                                 node.Type == ASTNodeType.FOREACH)
                         {
                             if (depth == 0)
                                 break;
