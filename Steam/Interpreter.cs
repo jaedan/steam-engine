@@ -16,7 +16,7 @@ namespace UOSteam
 
     internal class Scope
     {
-        public Dictionary<string, object> Namespace = new Dictionary<string, object>();
+        public Dictionary<string, Argument> Namespace = new Dictionary<string, Argument>();
 
         public readonly ASTNode StartNode;
         public readonly Scope Parent;
@@ -31,8 +31,9 @@ namespace UOSteam
     public class Argument
     {
         private ASTNode _node;
+        private Script _script;
 
-        public Argument(ASTNode node)
+        public Argument(Script script, ASTNode node)
         {
             _node = node;
         }
@@ -42,6 +43,11 @@ namespace UOSteam
         {
             if (_node.Lexeme == null)
                 throw new RunTimeError(_node, "Cannot convert argument to int");
+
+            // Try to resolve it as a scoped variable first
+            var arg = _script.Lookup(_node.Lexeme);
+            if (arg != null)
+                return arg.AsInt();
 
             int val;
 
@@ -61,6 +67,11 @@ namespace UOSteam
         {
             if (_node.Lexeme == null)
                 throw new RunTimeError(_node, "Cannot convert argument to uint");
+
+            // Try to resolve it as a scoped variable first
+            var arg = _script.Lookup(_node.Lexeme);
+            if (arg != null)
+                return arg.AsUInt();
 
             uint val;
 
@@ -82,9 +93,13 @@ namespace UOSteam
             if (_node.Lexeme == null)
                 throw new RunTimeError(_node, "Cannot convert argument to serial");
 
-            // Resolving aliases takes precedence
-            uint serial = Interpreter.GetAlias(_node.Lexeme);
+            // Try to resolve it as a scoped variable first
+            var arg = _script.Lookup(_node.Lexeme);
+            if (arg != null)
+                return arg.AsSerial();
 
+            // Resolve it as a global alias next
+            uint serial = Interpreter.GetAlias(_node.Lexeme);
             if (serial != uint.MaxValue)
                 return serial;
 
@@ -97,6 +112,11 @@ namespace UOSteam
             if (_node.Lexeme == null)
                 throw new RunTimeError(_node, "Cannot convert argument to string");
 
+            // Try to resolve it as a scoped variable first
+            var arg = _script.Lookup(_node.Lexeme);
+            if (arg != null)
+                return arg.AsString();
+
             return _node.Lexeme;
         }
     }
@@ -107,10 +127,10 @@ namespace UOSteam
 
         private Scope _scope;
 
-        private object Lookup(string name)
+        public Argument Lookup(string name)
         {
             var scope = _scope;
-            object result = null;
+            Argument result = null;
 
             while (scope != null)
             {
@@ -152,7 +172,7 @@ namespace UOSteam
                         return args.ToArray();
                 }
 
-                args.Add(new Argument(node));
+                args.Add(new Argument(this, node));
 
                 node = node.Next();
             }
@@ -698,7 +718,7 @@ namespace UOSteam
         private static Dictionary<string, uint> _aliases = new Dictionary<string, uint>();
 
         // Lists
-        private static Dictionary<string, object[]> _lists = new Dictionary<string, object[]>();
+        private static Dictionary<string, List<Argument>> _lists = new Dictionary<string, List<Argument>>();
 
         public delegate int ExpressionHandler(string expression, Argument[] args, bool quiet);
 
@@ -768,6 +788,35 @@ namespace UOSteam
         public static void SetAlias(string alias, uint serial)
         {
             _aliases[alias] = serial;
+        }
+
+        public static void CreateList(string name)
+        {
+            if (_lists.ContainsKey(name))
+                return;
+
+            _lists[name] = new List<Argument>();
+        }
+
+        public static void DestroyList(string name)
+        {
+            _lists.Remove(name);
+        }
+
+        public static void ClearList(string name)
+        {
+            if (!_lists.ContainsKey(name))
+                return;
+
+            _lists[name].Clear();
+        }
+
+        public static void PushList(string name, Argument arg)
+        {
+            if (!_lists.ContainsKey(name))
+                throw new RunTimeError(null, "List does not exist");
+
+            _lists[name].Add(arg);
         }
 
         public static void StartScript(Script script)
