@@ -60,6 +60,7 @@ namespace UOSteam
         STRING,
         SERIAL,
         INTEGER,
+        LIST,
 
         // Modifiers
         QUIET, // @ symbol
@@ -561,26 +562,39 @@ namespace UOSteam
             // iterate a fixed number of times. The other two iterate
             // parts of lists. We call those second two FOREACH.
 
+            // We're intentionally deprecating one of the loop
+            // variants here as well. The for X to Y variant, where
+            // both X and Y are integers, is useless. It can be just written
+            // as for X.
+
             if (lexemes.Length == 1)
             {
                 // for X
                 var loop = statement.Push(ASTNodeType.FOR, null);
 
-                loop.Push(ASTNodeType.INTEGER, "0");
                 ParseValue(loop, lexemes[0]);
 
             }
-            else if (lexemes.Length == 3)
+            else if (lexemes.Length == 3 && lexemes[1] == "to")
             {
-                // This one can be either a for or a foreach.
+                // for X to LIST
+                var loop = statement.Push(ASTNodeType.FOREACH, null);
+
+                ParseValue(loop, lexemes[0]);
+                loop.Push(ASTNodeType.LIST, lexemes[2]);
             }
-            else if (lexemes.Length == 5)
+            else if (lexemes.Length == 5 && lexemes[1] == "to" && lexemes[3] == "in")
             {
                 // for X to Y in LIST
                 var loop = statement.Push(ASTNodeType.FOREACH, null);
 
                 ParseValue(loop, lexemes[0]);
                 ParseValue(loop, lexemes[2]);
+                loop.Push(ASTNodeType.LIST, lexemes[4]);
+            }
+            else
+            {
+                throw new SyntaxError(statement, "Invalid for loop");
             }
         }
     }

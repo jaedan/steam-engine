@@ -7,36 +7,16 @@ namespace UOSteam
     // so valid scripts will at least run for testing.
     public static class Commands
     {
-        private static int DummyExpression(ref ASTNode node, bool quiet)
+        private static int DummyExpression(string expression, Argument[] args, bool quiet)
         {
-            Console.WriteLine("Executing expression {0} {1}", node.Type, node.Lexeme);
-
-            while (node != null)
-            {
-                switch (node.Type)
-                {
-                    case ASTNodeType.AND:
-                    case ASTNodeType.OR:
-                    case ASTNodeType.EQUAL:
-                    case ASTNodeType.NOT_EQUAL:
-                    case ASTNodeType.LESS_THAN:
-                    case ASTNodeType.LESS_THAN_OR_EQUAL:
-                    case ASTNodeType.GREATER_THAN:
-                    case ASTNodeType.GREATER_THAN_OR_EQUAL:
-                        return 0;
-                }
-
-                node = node.Next();
-            }
+            Console.WriteLine("Executing expression {0} {1}", expression, args);
 
             return 0;
         }
 
-        private static bool DummyCommand(ref ASTNode node, bool quiet, bool force)
+        private static bool DummyCommand(string command, Argument[] args, bool quiet, bool force)
         {
-            Console.WriteLine("Executing command {0} {1}", node.Type, node.Lexeme);
-
-            node = null;
+            Console.WriteLine("Executing command {0} {1}", command, args);
 
             return true;
         }

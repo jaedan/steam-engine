@@ -36,6 +36,7 @@ namespace UOSteam
         public Argument(Script script, ASTNode node)
         {
             _node = node;
+            _script = script;
         }
 
         // Treat the argument as an integer
@@ -136,6 +137,8 @@ namespace UOSteam
             {
                 if (scope.Namespace.TryGetValue(name, out result))
                     return result;
+
+                scope = scope.Parent;
             }
 
             return result;
@@ -420,8 +423,81 @@ namespace UOSteam
 
                     break;
                 case ASTNodeType.FOR:
+                    // When we first enter the loop, push a new scope
+                    if (_scope.StartNode != node)
+                    {
+                        PushScope(node);
+
+                        // Grab the arguments
+                        var max = node.FirstChild();
+
+                        if (max.Type != ASTNodeType.INTEGER)
+                            throw new RunTimeError(max, "Invalid for loop syntax");
+
+                        // Create a dummy argument that acts as our loop variable
+                        var iter = new ASTNode(ASTNodeType.INTEGER, "0", node);
+
+                        _scope.Namespace[node.GetHashCode().ToString()] = new Argument(this, iter);
+                    }
+                    else
+                    {
+                        // Increment the iterator argument
+                        var arg = _scope.Namespace[node.GetHashCode().ToString()];
+
+                        var iter = new ASTNode(ASTNodeType.INTEGER, (arg.AsUInt() + 1).ToString(), node);
+
+                        _scope.Namespace[node.GetHashCode().ToString()] = new Argument(this, iter);
+                    }
+
+                    // Check loop condition
+                    var i = _scope.Namespace[node.GetHashCode().ToString()];
+
+                    // Grab the max value to iterate to
+                    node = node.FirstChild();
+                    var end = new Argument(this, node);
+
+                    if (i.AsUInt() < end.AsUInt())
+                    {
+                        // enter the loop
+                        _statement = _statement.Next();
+                    }
+                    else
+                    {
+                        // Walk until the end of the loop
+                        _statement = _statement.Next();
+
+                        depth = 0;
+
+                        while (_statement != null)
+                        {
+                            node = _statement.FirstChild();
+
+                            if (node.Type == ASTNodeType.FOR ||
+                                node.Type == ASTNodeType.FOREACH)
+                            {
+                                depth++;
+                            }
+                            else if (node.Type == ASTNodeType.ENDFOR)
+                            {
+                                if (depth == 0)
+                                {
+                                    PopScope();
+
+                                    // Go one past the end so the loop doesn't repeat
+                                    _statement = _statement.Next();
+                                    break;
+                                }
+
+                                depth--;
+                            }
+
+                            _statement = _statement.Next();
+                        }
+
+                        PopScope();
+                    }
+                    break;
                 case ASTNodeType.FOREACH:
-                    PushScope(node);
                     throw new RunTimeError(node, "For loops are not supported yet");
                 case ASTNodeType.ENDFOR:
                     // Walk backward to the for statement
@@ -443,7 +519,6 @@ namespace UOSteam
                     if (_statement == null)
                         throw new RunTimeError(node, "Unexpected endfor");
 
-                    PopScope();
                     break;
                 case ASTNodeType.BREAK:
                     // Walk until the end of the loop
