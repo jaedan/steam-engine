@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Net;
 
 namespace UOSteam
 {
@@ -423,82 +424,160 @@ namespace UOSteam
 
                     break;
                 case ASTNodeType.FOR:
-                    // When we first enter the loop, push a new scope
-                    if (_scope.StartNode != node)
                     {
-                        PushScope(node);
-
-                        // Grab the arguments
-                        var max = node.FirstChild();
-
-                        if (max.Type != ASTNodeType.INTEGER)
-                            throw new RunTimeError(max, "Invalid for loop syntax");
-
-                        // Create a dummy argument that acts as our loop variable
-                        var iter = new ASTNode(ASTNodeType.INTEGER, "0", node);
-
-                        _scope.Namespace[node.GetHashCode().ToString()] = new Argument(this, iter);
-                    }
-                    else
-                    {
-                        // Increment the iterator argument
-                        var arg = _scope.Namespace[node.GetHashCode().ToString()];
-
-                        var iter = new ASTNode(ASTNodeType.INTEGER, (arg.AsUInt() + 1).ToString(), node);
-
-                        _scope.Namespace[node.GetHashCode().ToString()] = new Argument(this, iter);
-                    }
-
-                    // Check loop condition
-                    var i = _scope.Namespace[node.GetHashCode().ToString()];
-
-                    // Grab the max value to iterate to
-                    node = node.FirstChild();
-                    var end = new Argument(this, node);
-
-                    if (i.AsUInt() < end.AsUInt())
-                    {
-                        // enter the loop
-                        _statement = _statement.Next();
-                    }
-                    else
-                    {
-                        // Walk until the end of the loop
-                        _statement = _statement.Next();
-
-                        depth = 0;
-
-                        while (_statement != null)
+                        // When we first enter the loop, push a new scope
+                        if (_scope.StartNode != node)
                         {
-                            node = _statement.FirstChild();
+                            PushScope(node);
 
-                            if (node.Type == ASTNodeType.FOR ||
-                                node.Type == ASTNodeType.FOREACH)
-                            {
-                                depth++;
-                            }
-                            else if (node.Type == ASTNodeType.ENDFOR)
-                            {
-                                if (depth == 0)
-                                {
-                                    PopScope();
+                            // Grab the arguments
+                            var max = node.FirstChild();
 
-                                    // Go one past the end so the loop doesn't repeat
-                                    _statement = _statement.Next();
-                                    break;
-                                }
+                            if (max.Type != ASTNodeType.INTEGER)
+                                throw new RunTimeError(max, "Invalid for loop syntax");
 
-                                depth--;
-                            }
+                            // Create a dummy argument that acts as our loop variable
+                            var iter = new ASTNode(ASTNodeType.INTEGER, "0", node);
 
-                            _statement = _statement.Next();
+                            _scope.Namespace[node.GetHashCode().ToString()] = new Argument(this, iter);
+                        }
+                        else
+                        {
+                            // Increment the iterator argument
+                            var arg = _scope.Namespace[node.GetHashCode().ToString()];
+
+                            var iter = new ASTNode(ASTNodeType.INTEGER, (arg.AsUInt() + 1).ToString(), node);
+
+                            _scope.Namespace[node.GetHashCode().ToString()] = new Argument(this, iter);
                         }
 
-                        PopScope();
+                        // Check loop condition
+                        var i = _scope.Namespace[node.GetHashCode().ToString()];
+
+                        // Grab the max value to iterate to
+                        node = node.FirstChild();
+                        var end = new Argument(this, node);
+
+                        if (i.AsUInt() < end.AsUInt())
+                        {
+                            // enter the loop
+                            _statement = _statement.Next();
+                        }
+                        else
+                        {
+                            // Walk until the end of the loop
+                            _statement = _statement.Next();
+
+                            depth = 0;
+
+                            while (_statement != null)
+                            {
+                                node = _statement.FirstChild();
+
+                                if (node.Type == ASTNodeType.FOR ||
+                                    node.Type == ASTNodeType.FOREACH)
+                                {
+                                    depth++;
+                                }
+                                else if (node.Type == ASTNodeType.ENDFOR)
+                                {
+                                    if (depth == 0)
+                                    {
+                                        PopScope();
+
+                                        // Go one past the end so the loop doesn't repeat
+                                        _statement = _statement.Next();
+                                        break;
+                                    }
+
+                                    depth--;
+                                }
+
+                                _statement = _statement.Next();
+                            }
+
+                            PopScope();
+                        }
                     }
                     break;
                 case ASTNodeType.FOREACH:
-                    throw new RunTimeError(node, "For loops are not supported yet");
+                    {
+                        // When we first enter the loop, push a new scope
+                        if (_scope.StartNode != node)
+                        {
+                            PushScope(node);
+
+                            // Grab the starting index
+                            var s = node.FirstChild();
+
+                            if (s.Type != ASTNodeType.INTEGER)
+                                throw new RunTimeError(s, "Invalid for loop syntax");
+
+                            // Create a dummy argument that acts as our loop variable
+                            var iter = new ASTNode(ASTNodeType.INTEGER, s.Lexeme, node);
+                            _scope.Namespace[node.GetHashCode().ToString()] = new Argument(this, iter);
+                        }
+                        else
+                        {
+                            // Increment the iterator argument
+                            var arg = _scope.Namespace[node.GetHashCode().ToString()];
+
+                            var iter = new ASTNode(ASTNodeType.INTEGER, (arg.AsUInt() + 1).ToString(), node);
+
+                            _scope.Namespace[node.GetHashCode().ToString()] = new Argument(this, iter);
+                        }
+
+                        // Check loop condition
+                        var i = _scope.Namespace[node.GetHashCode().ToString()];
+
+                        // Grab the max value to iterate to
+                        node = node.FirstChild();
+                        var start = new Argument(this, node);
+                        
+                        // Grab the end
+
+                        if (i.AsUInt() < end.AsUInt())
+                        {
+                            // enter the loop
+                            _statement = _statement.Next();
+                        }
+                        else
+                        {
+                            // Walk until the end of the loop
+                            _statement = _statement.Next();
+
+                            depth = 0;
+
+                            while (_statement != null)
+                            {
+                                node = _statement.FirstChild();
+
+                                if (node.Type == ASTNodeType.FOR ||
+                                    node.Type == ASTNodeType.FOREACH)
+                                {
+                                    depth++;
+                                }
+                                else if (node.Type == ASTNodeType.ENDFOR)
+                                {
+                                    if (depth == 0)
+                                    {
+                                        PopScope();
+
+                                        // Go one past the end so the loop doesn't repeat
+                                        _statement = _statement.Next();
+                                        break;
+                                    }
+
+                                    depth--;
+                                }
+
+                                _statement = _statement.Next();
+                            }
+
+                            PopScope();
+                        }
+                        break;
+                    }
                 case ASTNodeType.ENDFOR:
                     // Walk backward to the for statement
                     _statement = _statement.Prev();
@@ -892,6 +971,14 @@ namespace UOSteam
                 throw new RunTimeError(null, "List does not exist");
 
             _lists[name].Add(arg);
+        }
+
+        public static Argument GetListValue(string name, int idx)
+        {
+            if (!_lists.ContainsKey(name))
+                throw new RunTimeError(null, "List does not exist");
+
+            return _lists[name][idx];
         }
 
         public static void StartScript(Script script)

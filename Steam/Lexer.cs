@@ -558,7 +558,7 @@ namespace UOSteam
 
         private static void ParseForLoop(ASTNode statement, string[] lexemes)
         {
-            // There are 4 variants of for loops. The simplest two just
+            // There are 4 variants of for loops in steam. The simplest two just
             // iterate a fixed number of times. The other two iterate
             // parts of lists. We call those second two FOREACH.
 
