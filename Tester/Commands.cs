@@ -21,6 +21,31 @@ namespace UOSteam
             return true;
         }
 
+        private static bool MsgCommand(string command, Argument[] args, bool quiet, bool force)
+        {
+            Console.WriteLine("Msg {0}", args[0].AsString());
+
+            return true;
+        }
+
+        private static bool CreateList(string command, Argument[] args, bool quiet, bool force)
+        {
+            Console.WriteLine("Creating list {0}", args[0].AsString());
+
+            Interpreter.CreateList(args[0].AsString());
+
+            return true;
+        }
+
+        private static bool PushList(string command, Argument[] args, bool quiet, bool force)
+        {
+            Console.WriteLine("Pushing {0} to list {1}", args[1].AsString(), args[0].AsString());
+
+            Interpreter.PushList(args[0].AsString(), args[1]);
+
+            return true;
+        }
+
         public static void RegisterDummyCommands()
         {
             // Commands. From UOSteam Documentation
@@ -71,9 +96,9 @@ namespace UOSteam
             Interpreter.RegisterCommandHandler("clearjournal", DummyCommand);
             Interpreter.RegisterCommandHandler("waitforjournal", DummyCommand);
             Interpreter.RegisterCommandHandler("poplist", DummyCommand);
-            Interpreter.RegisterCommandHandler("pushlist", DummyCommand);
+            Interpreter.RegisterCommandHandler("pushlist", PushList);
             Interpreter.RegisterCommandHandler("removelist", DummyCommand);
-            Interpreter.RegisterCommandHandler("createlist", DummyCommand);
+            Interpreter.RegisterCommandHandler("createlist", CreateList);
             Interpreter.RegisterCommandHandler("clearlist", DummyCommand);
             Interpreter.RegisterCommandHandler("info", DummyCommand);
             Interpreter.RegisterCommandHandler("pause", DummyCommand);
@@ -93,7 +118,7 @@ namespace UOSteam
             Interpreter.RegisterCommandHandler("questsbutton", DummyCommand);
             Interpreter.RegisterCommandHandler("logoutbutton", DummyCommand);
             Interpreter.RegisterCommandHandler("virtue", DummyCommand);
-            Interpreter.RegisterCommandHandler("msg", DummyCommand);
+            Interpreter.RegisterCommandHandler("msg", MsgCommand);
             Interpreter.RegisterCommandHandler("headmsg", DummyCommand);
             Interpreter.RegisterCommandHandler("partymsg", DummyCommand);
             Interpreter.RegisterCommandHandler("guildmsg", DummyCommand);
