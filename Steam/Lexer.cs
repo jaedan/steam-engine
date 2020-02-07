@@ -593,8 +593,8 @@ namespace UOSteam
                 // for X to LIST
                 var loop = statement.Push(ASTNodeType.FOREACH, null);
 
-                ParseValue(loop, lexemes[0]);
-                loop.Push(ASTNodeType.LIST, lexemes[2]);
+                loop.Push(ASTNodeType.STRING, lexemes[2]);
+                loop.Push(ASTNodeType.LIST, lexemes[2].Substring(0, lexemes[2].Length - 2));
             }
             else
             {
