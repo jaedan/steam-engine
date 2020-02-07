@@ -141,6 +141,27 @@ namespace UOSteam
 
             return _node.Lexeme;
         }
+
+        public override bool Equals(object obj)
+        {
+            if (obj == null)
+                return false;
+
+            Argument arg = obj as Argument;
+
+            if (arg == null)
+                return false;
+
+            return Equals(arg);
+        }
+
+        public bool Equals(Argument other)
+        {
+            if (other == null)
+                return false;
+
+            return (other._node.Lexeme == _node.Lexeme);
+        }
     }
 
     public class Script
@@ -997,12 +1018,59 @@ namespace UOSteam
             _lists[name].Clear();
         }
 
-        public static void PushList(string name, Argument arg)
+        public static bool ListExists(string name)
+        {
+            return _lists.ContainsKey(name);
+        }
+
+        public static bool ListContains(string name, Argument arg)
         {
             if (!_lists.ContainsKey(name))
                 throw new RunTimeError(null, "List does not exist");
 
-            _lists[name].Add(arg);
+            return _lists[name].Contains(arg);
+        }
+
+        public static int ListLength(string name)
+        {
+            if (!_lists.ContainsKey(name))
+                throw new RunTimeError(null, "List does not exist");
+
+            return _lists[name].Count;
+        }
+
+        public static void PushList(string name, Argument arg, bool front, bool unique)
+        {
+            if (!_lists.ContainsKey(name))
+                throw new RunTimeError(null, "List does not exist");
+
+            if (unique && _lists[name].Contains(arg))
+                return;
+
+            if (front)
+                _lists[name].Add(arg);
+            else
+                _lists[name].Insert(0, arg);
+        }
+
+        public static bool PopList(string name, Argument arg)
+        {
+            if (!_lists.ContainsKey(name))
+                throw new RunTimeError(null, "List does not exist");
+
+            return _lists[name].Remove(arg);
+        }
+
+        public static bool PopList(string name, bool front)
+        {
+            if (!_lists.ContainsKey(name))
+                throw new RunTimeError(null, "List does not exist");
+
+            var idx = front ? 0 : _lists[name].Count - 1;
+
+            _lists[name].RemoveAt(idx);
+
+            return _lists[name].Count > 0;
         }
 
         public static Argument GetListValue(string name, int idx)

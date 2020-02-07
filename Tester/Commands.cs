@@ -41,7 +41,7 @@ namespace UOSteam
         {
             Console.WriteLine("Pushing {0} to list {1}", args[1].AsString(), args[0].AsString());
 
-            Interpreter.PushList(args[0].AsString(), args[1]);
+            Interpreter.PushList(args[0].AsString(), args[1], true, false);
 
             return true;
         }
