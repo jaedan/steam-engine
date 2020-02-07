@@ -1048,9 +1048,9 @@ namespace UOSteam
                 return;
 
             if (front)
-                _lists[name].Add(arg);
-            else
                 _lists[name].Insert(0, arg);
+            else
+                _lists[name].Add(arg);
         }
 
         public static bool PopList(string name, Argument arg)
