@@ -397,6 +397,7 @@ namespace UOSteam
                     statement.Push(ASTNodeType.STOP, null);
                     break;
                 case "replay":
+                case "loop":
                     if (lexemes.Length > 1)
                         throw new SyntaxError(node, "Script compilation error");
 
