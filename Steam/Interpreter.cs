@@ -886,18 +886,18 @@ namespace UOSteam
             node = EvaluateModifiers(node, out bool quiet, out _, out bool not);
 
             // Unary expressions are converted to bool.
-            var result = ExecuteExpression(ref node, quiet) != 0;
+            double result = ExecuteExpression(ref node, quiet);
 
             if (not)
-                return !result;
+                return (result == 0);
             else
-                return result;
+                return (result != 0);
         }
 
         private bool EvaluateBinaryExpression(ref ASTNode node)
         {
-            int lhs;
-            int rhs;
+            double lhs;
+            double rhs;
 
             // Evaluate the left hand side
             node = EvaluateModifiers(node, out bool quiet, out _, out _);
@@ -942,7 +942,7 @@ namespace UOSteam
             throw new RunTimeError(node, "Invalid operator type in expression");
         }
 
-        private int ExecuteExpression(ref ASTNode node, bool quiet)
+        private double ExecuteExpression(ref ASTNode node, bool quiet)
         {
             var handler = Interpreter.GetExpressionHandler(node.Lexeme);
 
@@ -963,7 +963,7 @@ namespace UOSteam
         // Lists
         private static Dictionary<string, List<Argument>> _lists = new Dictionary<string, List<Argument>>();
 
-        public delegate int ExpressionHandler(string expression, Argument[] args, bool quiet);
+        public delegate double ExpressionHandler(string expression, Argument[] args, bool quiet);
 
         private static Dictionary<string, ExpressionHandler> _exprHandlers = new Dictionary<string, ExpressionHandler>();
 

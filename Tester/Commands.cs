@@ -7,7 +7,7 @@ namespace UOSteam
     // so valid scripts will at least run for testing.
     public static class Commands
     {
-        private static int DummyExpression(string expression, Argument[] args, bool quiet)
+        private static double DummyExpression(string expression, Argument[] args, bool quiet)
         {
             Console.WriteLine("Executing expression {0} {1}", expression, args);
 
