@@ -34,7 +34,7 @@ namespace UOSteam
 
             Interpreter.StartScript(script);
 
-            while (Interpreter.ExecuteScripts()) { };
+            while (Interpreter.ExecuteScript()) { };
 
             Console.WriteLine("Done!");
         }

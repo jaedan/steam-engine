@@ -975,7 +975,7 @@ namespace UOSteam
 
         private static Dictionary<string, AliasHandler> _aliasHandlers = new Dictionary<string, AliasHandler>();
 
-        private static LinkedList<Script> _scripts = new LinkedList<Script>();
+        private static Script _activeScript = null;
 
         public static CultureInfo Culture;
 
@@ -1127,31 +1127,35 @@ namespace UOSteam
             return null;
         }
 
-        public static void StartScript(Script script)
+        public static bool StartScript(Script script)
         {
-            _scripts.AddLast(script);
+            if (_activeScript != null)
+                return false;
+
+            _activeScript = script;
+
+            ExecuteScript();
+
+            return true;
         }
 
-        public static void StopScript(Script script)
+        public static void StopScript()
         {
-            _scripts.Remove(script);
+            _activeScript = null;
         }
 
-        public static bool ExecuteScripts()
+        public static bool ExecuteScript()
         {
-            var node = _scripts.Last;
+            if (_activeScript == null)
+                return false;
 
-            while (node != null)
+            if (!_activeScript.ExecuteNext())
             {
-                var prev = node.Previous;
-
-                if (!node.Value.ExecuteNext())
-                    _scripts.Remove(node);
-
-                node = prev;
+                _activeScript = null;
+                return false;
             }
 
-            return _scripts.Count > 0;
+            return true;
         }
     }
 }
