@@ -1018,6 +1018,9 @@ namespace UOScript
         // Lists
         private static Dictionary<string, List<Argument>> _lists = new Dictionary<string, List<Argument>>();
 
+        // Timers
+        private static Dictionary<string, DateTime> _timers = new Dictionary<string, DateTime>();
+
         // Expressions
         public delegate IComparable ExpressionHandler(string expression, Argument[] args, bool quiet);
         public delegate T ExpressionHandler<T>(string expression, Argument[] args, bool quiet) where T : IComparable;
@@ -1192,6 +1195,38 @@ namespace UOScript
                 return list[idx];
 
             return null;
+        }
+
+        public static void CreateTimer(string name)
+        {
+            _timers[name] = DateTime.UtcNow;
+        }
+
+        public static int GetTimer(string name)
+        {
+            if (!_timers.TryGetValue(name, out DateTime timestamp))
+                throw new RunTimeError(null, "Timer does not exist");
+
+            TimeSpan elapsed = DateTime.UtcNow - timestamp;
+
+            return (int)elapsed.TotalMilliseconds;
+        }
+
+        public static void SetTimer(string name, int elapsed)
+        {
+            // Setting a timer to start at a given value is equivalent to
+            // starting the timer that number of milliseconds in the past.
+            _timers[name] = DateTime.UtcNow.AddMilliseconds(-elapsed);
+        }
+
+        public static void RemoveTimer(string name)
+        {
+            _timers.Remove(name);
+        }
+
+        public static bool TimerExists(string name)
+        {
+            return _timers.ContainsKey(name);
         }
 
         public static bool StartScript(Script script)
