@@ -963,6 +963,9 @@ namespace UOSteam
         // Lists
         private static Dictionary<string, List<Argument>> _lists = new Dictionary<string, List<Argument>>();
 
+        // Timers
+        private static Dictionary<string, DateTime> _timers = new Dictionary<string, DateTime>();
+
         public delegate double ExpressionHandler(string expression, Argument[] args, bool quiet);
 
         private static Dictionary<string, ExpressionHandler> _exprHandlers = new Dictionary<string, ExpressionHandler>();
@@ -1125,6 +1128,40 @@ namespace UOSteam
                 return list[idx];
 
             return null;
+        }
+
+        public static void CreateTimer(string name)
+        {
+            _timers[name] = DateTime.UtcNow;
+        }
+
+        public static int GetTimer(string name)
+        {
+            if (!_timers.TryGetValue(name, out DateTime timestamp))
+                throw new RunTimeError(null, "Timer does not exist");
+
+            TimeSpan elapsed = DateTime.UtcNow - timestamp;
+
+            return (int) elapsed.TotalMilliseconds;
+        }
+
+        public static void SetTimer(string name, int elapsed)
+        {
+            // no reason to prevent setting a timer which doesn't currently exist
+            //if(!_timers.ContainsKey(timer))
+            //    throw new RunTimeError(null, "Timer does not exist");
+
+            _timers[name] = DateTime.UtcNow.AddMilliseconds(-elapsed);
+        }
+
+        public static void RemoveTimer(string name)
+        {
+            _timers.Remove(name);
+        }
+
+        public static bool TimerExists(string name)
+        {
+            return _timers.ContainsKey(name);
         }
 
         public static bool StartScript(Script script)
