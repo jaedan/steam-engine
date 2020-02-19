@@ -1135,14 +1135,14 @@ namespace UOSteam
             _timers[name] = DateTime.UtcNow;
         }
 
-        public static int GetTimer(string name)
+        public static TimeSpan GetTimer(string name)
         {
             if (!_timers.TryGetValue(name, out DateTime timestamp))
                 throw new RunTimeError(null, "Timer does not exist");
 
             TimeSpan elapsed = DateTime.UtcNow - timestamp;
 
-            return (int) elapsed.TotalMilliseconds;
+            return elapsed;
         }
 
         public static void SetTimer(string name, int elapsed)
