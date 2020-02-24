@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 
-namespace UOSteam
+namespace UOScript
 {
     public class RunTimeError : Exception
     {

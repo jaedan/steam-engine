@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace UOSteam
+namespace UOScript
 {
     class Tester
     {

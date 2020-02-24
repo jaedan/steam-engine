@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace UOSteam
+namespace UOScript
 {
     // This registers default handlers for all of the commands and expressions
     // so valid scripts will at least run for testing.
