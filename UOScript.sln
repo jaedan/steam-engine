@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.29418.71
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tester", "Tester\Tester.csproj", "{A78CC761-AECE-428D-98C6-E3AFD74A4820}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Engine", "Engine\Engine.csproj", "{569EABF7-8980-4A3B-BF3A-6321C4B1DA78}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UOScript", "UOScript\UOScript.csproj", "{569EABF7-8980-4A3B-BF3A-6321C4B1DA78}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

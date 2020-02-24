@@ -97,9 +97,9 @@
     <Folder Include="Properties\" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Engine\Engine.csproj">
+    <ProjectReference Include="..\UOScript\UOScript.csproj">
       <Project>{569eabf7-8980-4a3b-bf3a-6321c4b1da78}</Project>
-      <Name>Engine</Name>
+      <Name>UOScript</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
