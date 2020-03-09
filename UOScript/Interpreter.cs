@@ -15,6 +15,74 @@ namespace UOScript
         }
     }
 
+    internal static class TypeConverter
+    {
+        public static int ToInt(string token)
+        {
+            int val;
+
+            if (token.StartsWith("0x"))
+            {
+                if (int.TryParse(token.Substring(2), NumberStyles.HexNumber, Interpreter.Culture, out val))
+                    return val;
+            }
+            else if (int.TryParse(token, out val))
+                return val;
+
+            throw new RunTimeError(null, "Cannot convert argument to int");
+        }
+
+        public static uint ToUInt(string token)
+        {
+            uint val;
+
+            if (token.StartsWith("0x"))
+            {
+                if (uint.TryParse(token.Substring(2), NumberStyles.HexNumber, Interpreter.Culture, out val))
+                    return val;
+            }
+            else if (uint.TryParse(token, out val))
+                return val;
+
+            throw new RunTimeError(null, "Cannot convert argument to uint");
+        }
+
+        public static ushort ToUShort(string token)
+        {
+            ushort val;
+
+            if (token.StartsWith("0x"))
+            {
+                if (ushort.TryParse(token.Substring(2), NumberStyles.HexNumber, Interpreter.Culture, out val))
+                    return val;
+            }
+            else if (ushort.TryParse(token, out val))
+                return val;
+
+            throw new RunTimeError(null, "Cannot convert argument to ushort");
+        }
+
+        public static double ToDouble(string token)
+        {
+            double val;
+
+            if (double.TryParse(token, out val))
+                return val;
+
+            throw new RunTimeError(null, "Cannot convert argument to double");
+        }
+
+        public static bool ToBool(string token)
+        {
+            bool val;
+
+            if (bool.TryParse(token, out val))
+                return val;
+
+            throw new RunTimeError(null, "Cannot convert argument to bool");
+        }
+    }
+
     internal class Scope
     {
         private Dictionary<string, Argument> _namespace = new Dictionary<string, Argument>();
@@ -71,17 +139,7 @@ namespace UOScript
             if (arg != null)
                 return arg.AsInt();
 
-            int val;
-
-            if (_node.Lexeme.StartsWith("0x"))
-            {
-                if (int.TryParse(_node.Lexeme.Substring(2), NumberStyles.HexNumber, Interpreter.Culture, out val))
-                    return val;
-            }
-            else if (int.TryParse(_node.Lexeme, out val))
-                return val;
-
-            throw new RunTimeError(_node, "Cannot convert argument to int");
+            return TypeConverter.ToInt(_node.Lexeme);
         }
 
         // Treat the argument as an unsigned integer
@@ -95,17 +153,7 @@ namespace UOScript
             if (arg != null)
                 return arg.AsUInt();
 
-            uint val;
-
-            if (_node.Lexeme.StartsWith("0x"))
-            {
-                if (uint.TryParse(_node.Lexeme.Substring(2), NumberStyles.HexNumber, Interpreter.Culture, out val))
-                    return val;
-            }
-            else if (uint.TryParse(_node.Lexeme, out val))
-                return val;
-
-            throw new RunTimeError(_node, "Cannot convert argument to uint");
+            return TypeConverter.ToUInt(_node.Lexeme);
         }
 
         public ushort AsUShort()
@@ -118,17 +166,7 @@ namespace UOScript
             if (arg != null)
                 return arg.AsUShort();
 
-            ushort val;
-
-            if (_node.Lexeme.StartsWith("0x"))
-            {
-                if (ushort.TryParse(_node.Lexeme.Substring(2), NumberStyles.HexNumber, Interpreter.Culture, out val))
-                    return val;
-            }
-            else if (ushort.TryParse(_node.Lexeme, out val))
-                return val;
-
-            throw new RunTimeError(_node, "Cannot convert argument to ushort");
+            return TypeConverter.ToUShort(_node.Lexeme);
         }
 
         // Treat the argument as a serial or an alias. Aliases will
@@ -170,12 +208,7 @@ namespace UOScript
             if (_node.Lexeme == null)
                 throw new RunTimeError(_node, "Cannot convert argument to bool");
 
-            bool val;
-
-            if (bool.TryParse(_node.Lexeme, out val))
-                return val;
-
-            throw new RunTimeError(_node, "Cannot convert argument to bool");
+            return TypeConverter.ToBool(_node.Lexeme);
         }
 
         public override bool Equals(object obj)
@@ -885,65 +918,6 @@ namespace UOScript
         {
             node = EvaluateModifiers(node, out bool quiet, out _, out bool not);
 
-            // Unary expressions are converted to bool.
-            double result = ExecuteExpression(ref node, quiet);
-
-            if (not)
-                return (result == 0);
-            else
-                return (result != 0);
-        }
-
-        private bool EvaluateBinaryExpression(ref ASTNode node)
-        {
-            double lhs;
-            double rhs;
-
-            // Evaluate the left hand side
-            node = EvaluateModifiers(node, out bool quiet, out _, out _);
-            if (node.Type == ASTNodeType.INTEGER)
-            {
-                lhs = int.Parse(node.Lexeme);
-                node = node.Next();
-            }
-            else
-                lhs = ExecuteExpression(ref node, quiet);
-
-            // Capture the operator
-            var op = node.Type;
-            node = node.Next();
-
-            // Evaluate the right hand side
-            node = EvaluateModifiers(node, out quiet, out _, out _);
-            if (node.Type == ASTNodeType.INTEGER)
-            {
-                rhs = int.Parse(node.Lexeme);
-                node = node.Next();
-            }
-            else
-                rhs = ExecuteExpression(ref node, quiet);
-
-            switch (op)
-            {
-                case ASTNodeType.EQUAL:
-                    return lhs == rhs;
-                case ASTNodeType.NOT_EQUAL:
-                    return lhs != rhs;
-                case ASTNodeType.LESS_THAN:
-                    return lhs < rhs;
-                case ASTNodeType.LESS_THAN_OR_EQUAL:
-                    return lhs <= rhs;
-                case ASTNodeType.GREATER_THAN:
-                    return lhs > rhs;
-                case ASTNodeType.GREATER_THAN_OR_EQUAL:
-                    return lhs >= rhs;
-            }
-
-            throw new RunTimeError(node, "Invalid operator type in expression");
-        }
-
-        private double ExecuteExpression(ref ASTNode node, bool quiet)
-        {
             var handler = Interpreter.GetExpressionHandler(node.Lexeme);
 
             if (handler == null)
@@ -951,7 +925,84 @@ namespace UOScript
 
             var result = handler(node.Lexeme, ConstructArguments(ref node), quiet);
 
-            return result;
+            if (not)
+                return result.CompareTo(true) != 0;
+            else
+                return result.CompareTo(true) == 0;
+        }
+
+        private bool EvaluateBinaryExpression(ref ASTNode node)
+        {
+            // Evaluate the left hand side
+            var lhs = EvaluateBinaryOperand(ref node);
+
+            // Capture the operator
+            var op = node.Type;
+            node = node.Next();
+
+            // Evaluate the right hand side
+            var rhs = EvaluateBinaryOperand(ref node);
+
+            // Evaluate the whole expression
+            switch (op)
+            {
+                case ASTNodeType.EQUAL:
+                    return lhs.CompareTo(rhs) == 0;
+                case ASTNodeType.NOT_EQUAL:
+                    return lhs.CompareTo(rhs) != 0;
+                case ASTNodeType.LESS_THAN:
+                    return lhs.CompareTo(rhs) < 0;
+                case ASTNodeType.LESS_THAN_OR_EQUAL:
+                    return lhs.CompareTo(rhs) <= 0;
+                case ASTNodeType.GREATER_THAN:
+                    return lhs.CompareTo(rhs) > 0;
+                case ASTNodeType.GREATER_THAN_OR_EQUAL:
+                    return lhs.CompareTo(rhs) >= 0;
+            }
+
+            throw new RunTimeError(node, "Unknown operator in expression");
+        }
+
+        private IComparable EvaluateBinaryOperand(ref ASTNode node)
+        {
+            IComparable val;
+
+            node = EvaluateModifiers(node, out bool quiet, out _, out _);
+            switch (node.Type)
+            {
+                case ASTNodeType.INTEGER:
+                    val = TypeConverter.ToInt(node.Lexeme);
+                    break;
+                case ASTNodeType.SERIAL:
+                    val = TypeConverter.ToUInt(node.Lexeme);
+                    break;
+                case ASTNodeType.STRING:
+                    val = node.Lexeme;
+                    break;
+                case ASTNodeType.DOUBLE:
+                    val = TypeConverter.ToDouble(node.Lexeme);
+                    break;
+                case ASTNodeType.OPERAND:
+                    {
+                        // This might be a registered keyword, so do a lookup
+                        var handler = Interpreter.GetExpressionHandler(node.Lexeme);
+
+                        if (handler == null)
+                        {
+                            // It's just a string
+                            val = node.Lexeme;
+                        }
+                        else
+                        {
+                            val = handler(node.Lexeme, ConstructArguments(ref node), quiet);
+                        }
+                        break;
+                    }
+                default:
+                    throw new RunTimeError(node, "Invalid type found in expression");
+            }
+
+            return val;
         }
     }
 
@@ -963,7 +1014,9 @@ namespace UOScript
         // Lists
         private static Dictionary<string, List<Argument>> _lists = new Dictionary<string, List<Argument>>();
 
-        public delegate double ExpressionHandler(string expression, Argument[] args, bool quiet);
+        // Expressions
+        public delegate IComparable ExpressionHandler(string expression, Argument[] args, bool quiet);
+        public delegate T ExpressionHandler<T>(string expression, Argument[] args, bool quiet) where T : IComparable;
 
         private static Dictionary<string, ExpressionHandler> _exprHandlers = new Dictionary<string, ExpressionHandler>();
 
@@ -986,16 +1039,16 @@ namespace UOScript
             Culture.NumberFormat.NumberGroupSeparator = ",";
         }
 
-        public static void RegisterExpressionHandler(string keyword, ExpressionHandler handler)
+        public static void RegisterExpressionHandler<T>(string keyword, ExpressionHandler<T> handler) where T : IComparable
         {
-            _exprHandlers[keyword] = handler;
+            _exprHandlers[keyword] = (expression, args, quiet) => handler(expression, args, quiet);
         }
 
         public static ExpressionHandler GetExpressionHandler(string keyword)
         {
-            _exprHandlers.TryGetValue(keyword, out ExpressionHandler handler);
+            _exprHandlers.TryGetValue(keyword, out var expression);
 
-            return handler;
+            return expression;
         }
 
         public static void RegisterCommandHandler(string keyword, CommandHandler handler)

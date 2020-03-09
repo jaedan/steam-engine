@@ -60,6 +60,7 @@ namespace UOScript
         STRING,
         SERIAL,
         INTEGER,
+        DOUBLE,
         LIST,
 
         // Modifiers
@@ -70,6 +71,7 @@ namespace UOScript
         SCRIPT,
         STATEMENT,
         COMMAND,
+        OPERAND,
         LOGICAL_EXPRESSION,
         UNARY_EXPRESSION,
         BINARY_EXPRESSION,
@@ -239,14 +241,16 @@ namespace UOScript
             ParseStatement(node, lexemes);
         }
 
-        private static void ParseValue(ASTNode node, string lexeme)
+        private static void ParseValue(ASTNode node, string lexeme, ASTNodeType typeDefault)
         {
             if (lexeme.StartsWith("0x"))
                 node.Push(ASTNodeType.SERIAL, lexeme);
             else if (int.TryParse(lexeme, out _))
                 node.Push(ASTNodeType.INTEGER, lexeme);
+            else if (double.TryParse(lexeme, out _))
+                node.Push(ASTNodeType.DOUBLE, lexeme);
             else
-                node.Push(ASTNodeType.STRING, lexeme);
+                node.Push(typeDefault, lexeme);
         }
 
         private static void ParseCommand(ASTNode node, string lexeme)
@@ -268,6 +272,34 @@ namespace UOScript
             }
 
             node.Push(ASTNodeType.COMMAND, lexeme);
+        }
+
+        private static void ParseOperand(ASTNode node, string lexeme)
+        {
+            bool modifier = false;
+
+            // An operand may start with an '@' symbol. Pick that
+            // off.
+            if (lexeme[0] == '@')
+            {
+                node.Push(ASTNodeType.QUIET, null);
+                lexeme = lexeme.Substring(1, lexeme.Length - 1);
+                modifier = true;
+            }
+
+            // An operand may end with a '!' symbol. Pick that
+            // off.
+            if (lexeme.EndsWith("!"))
+            {
+                node.Push(ASTNodeType.FORCE, null);
+                lexeme = lexeme.Substring(0, lexeme.Length - 1);
+                modifier = true;
+            }
+
+            if (!modifier)
+                ParseValue(node, lexeme, ASTNodeType.OPERAND);
+            else
+                node.Push(ASTNodeType.OPERAND, lexeme);
         }
 
         private static void ParseOperator(ASTNode node, string lexeme)
@@ -409,7 +441,7 @@ namespace UOScript
 
                     foreach (var lexeme in lexemes.Slice(1, lexemes.Length - 1))
                     {
-                        ParseValue(statement, lexeme);
+                        ParseValue(statement, lexeme, ASTNodeType.STRING);
                     }
                     break;
             }
@@ -512,11 +544,11 @@ namespace UOScript
                 i++;
             }
 
-            ParseCommand(expr, lexemes[i++]);
+            ParseOperand(expr, lexemes[i++]);
 
             for (; i < lexemes.Length; i++)
             {
-                ParseValue(expr, lexemes[i]);
+                ParseValue(expr, lexemes[i], ASTNodeType.STRING);
             }
         }
 
@@ -526,42 +558,28 @@ namespace UOScript
 
             int i = 0;
 
-            // The expressions on either side of the operator can be integer values
-            // or commands that need to be evaluated.
-            if (int.TryParse(lexemes[i], out int _))
-            {
-                ParseValue(expr, lexemes[i++]);
-            }
-            else
-            {
-                ParseCommand(expr, lexemes[i++]);
-            }
+            // The expressions on either side of the operator can be values
+            // or operands that need to be evaluated.
+            ParseOperand(expr, lexemes[i++]);
 
             for (; i < lexemes.Length; i++)
             {
                 if (IsOperator(lexemes[i]))
                     break;
 
-                ParseValue(expr, lexemes[i]);
+                ParseValue(expr, lexemes[i], ASTNodeType.STRING);
             }
 
             ParseOperator(expr, lexemes[i++]);
 
-            if (int.TryParse(lexemes[i], out int _))
-            {
-                ParseValue(expr, lexemes[i++]);
-            }
-            else
-            {
-                ParseCommand(expr, lexemes[i++]);
-            }
+            ParseOperand(expr, lexemes[i++]);
 
             for (; i < lexemes.Length; i++)
             {
                 if (IsOperator(lexemes[i]))
                     break;
 
-                ParseValue(expr, lexemes[i]);
+                ParseValue(expr, lexemes[i], ASTNodeType.STRING);
             }
         }
 
@@ -586,7 +604,7 @@ namespace UOScript
                 // for X
                 var loop = statement.Push(ASTNodeType.FOR, null);
 
-                ParseValue(loop, lexemes[0]);
+                ParseValue(loop, lexemes[0], ASTNodeType.STRING);
 
             }
             else if (lexemes.Length == 3 && lexemes[1] == "to")
@@ -612,7 +630,7 @@ namespace UOScript
                 throw new SyntaxError(statement, "Invalid foreach loop");
 
             // This is the iterator name
-            ParseValue(loop, lexemes[0]);
+            ParseValue(loop, lexemes[0], ASTNodeType.STRING);
             loop.Push(ASTNodeType.LIST, lexemes[2]);
         }
     }
