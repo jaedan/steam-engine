@@ -1048,7 +1048,7 @@ namespace UOScript
 
         static Interpreter()
         {
-            Culture = new CultureInfo("en-EN", false);
+            Culture = new CultureInfo(CultureInfo.CurrentCulture.LCID, false);
             Culture.NumberFormat.NumberDecimalSeparator = ".";
             Culture.NumberFormat.NumberGroupSeparator = ",";
         }
