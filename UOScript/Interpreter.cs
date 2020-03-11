@@ -798,7 +798,11 @@ namespace UOScript
                 case ASTNodeType.FORCE:
                 case ASTNodeType.COMMAND:
                     if (ExecuteCommand(node))
+                    {
+                        Interpreter.ClearTimeout();
                         _statement = _statement.Next();
+                    }
+
                     break;
             }
 
@@ -1030,6 +1034,16 @@ namespace UOScript
 
         private static Script _activeScript = null;
 
+        private enum ExecutionState
+        {
+            RUNNING,
+            PAUSED,
+            TIMING_OUT
+        };
+
+        private static ExecutionState _executionState = ExecutionState.RUNNING;
+        private static long _pauseTimeout = long.MaxValue;
+
         public static CultureInfo Culture;
 
         static Interpreter()
@@ -1186,6 +1200,7 @@ namespace UOScript
                 return false;
 
             _activeScript = script;
+            _executionState = ExecutionState.RUNNING;
 
             ExecuteScript();
 
@@ -1195,12 +1210,29 @@ namespace UOScript
         public static void StopScript()
         {
             _activeScript = null;
+            _executionState = ExecutionState.RUNNING;
         }
 
         public static bool ExecuteScript()
         {
             if (_activeScript == null)
                 return false;
+
+            if (_executionState == ExecutionState.PAUSED)
+            {
+                if (_pauseTimeout >= DateTime.UtcNow.Ticks)
+                    _executionState = ExecutionState.RUNNING;
+                else
+                    return true;
+            }
+            else if (_executionState == ExecutionState.TIMING_OUT)
+            {
+                if (_pauseTimeout >= DateTime.UtcNow.Ticks)
+                {
+                    _activeScript = null;
+                    return false;
+                }
+            }
 
             if (!_activeScript.ExecuteNext())
             {
@@ -1209,6 +1241,37 @@ namespace UOScript
             }
 
             return true;
+        }
+
+        // Pause execution for the given number of ticks (as defined by DateTime.UtcNow)
+        public static void Pause(long duration)
+        {
+            // Already paused or timing out
+            if (_executionState != ExecutionState.RUNNING)
+                return;
+
+            _pauseTimeout = DateTime.UtcNow.Ticks + duration;
+            _executionState = ExecutionState.PAUSED;
+        }
+
+        // If forward progress on the script isn't made within this
+        // amount of time, bail
+        public static void Timeout(long duration)
+        {
+            // Don't change an existing timeout
+            if (_executionState != ExecutionState.RUNNING)
+                return;
+
+            _pauseTimeout = DateTime.UtcNow.Ticks + duration;
+            _executionState = ExecutionState.TIMING_OUT;
+        }
+
+        // Clears any previously set timeout. Automatically
+        // called any time the script advances a statement.
+        public static void ClearTimeout()
+        {
+            _pauseTimeout = 0;
+            _executionState = ExecutionState.RUNNING;
         }
     }
 }
