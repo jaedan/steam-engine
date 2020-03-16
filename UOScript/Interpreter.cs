@@ -551,7 +551,7 @@ namespace UOScript
                                 throw new RunTimeError(max, "Invalid for loop syntax");
 
                             // Create a dummy argument that acts as our loop variable
-                            var iter = new ASTNode(ASTNodeType.INTEGER, "0", node);
+                            var iter = new ASTNode(ASTNodeType.INTEGER, "0", node, 0);
 
                             _scope.SetVar(iterName, new Argument(this, iter));
                         }
@@ -560,7 +560,7 @@ namespace UOScript
                             // Increment the iterator argument
                             var arg = _scope.GetVar(iterName);
 
-                            var iter = new ASTNode(ASTNodeType.INTEGER, (arg.AsUInt() + 1).ToString(), node);
+                            var iter = new ASTNode(ASTNodeType.INTEGER, (arg.AsUInt() + 1).ToString(), node, 0);
 
                             _scope.SetVar(iterName, new Argument(this, iter));
                         }
@@ -628,7 +628,7 @@ namespace UOScript
                             PushScope(node);
 
                             // Create a dummy argument that acts as our iterator object
-                            var iter = new ASTNode(ASTNodeType.INTEGER, "0", node);
+                            var iter = new ASTNode(ASTNodeType.INTEGER, "0", node, 0);
                             _scope.SetVar(iterName, new Argument(this, iter));
 
                             // Make the user-chosen variable have the value for the front of the list
@@ -643,7 +643,7 @@ namespace UOScript
                         {
                             // Increment the iterator argument
                             var idx = _scope.GetVar(iterName).AsInt() + 1;
-                            var iter = new ASTNode(ASTNodeType.INTEGER, idx.ToString(), node);
+                            var iter = new ASTNode(ASTNodeType.INTEGER, idx.ToString(), node, 0);
                             _scope.SetVar(iterName, new Argument(this, iter));
 
                             // Update the user-chosen variable
@@ -947,21 +947,28 @@ namespace UOScript
             // Evaluate the right hand side
             var rhs = EvaluateBinaryOperand(ref node);
 
-            // Evaluate the whole expression
-            switch (op)
+            try
             {
-                case ASTNodeType.EQUAL:
-                    return lhs.CompareTo(rhs) == 0;
-                case ASTNodeType.NOT_EQUAL:
-                    return lhs.CompareTo(rhs) != 0;
-                case ASTNodeType.LESS_THAN:
-                    return lhs.CompareTo(rhs) < 0;
-                case ASTNodeType.LESS_THAN_OR_EQUAL:
-                    return lhs.CompareTo(rhs) <= 0;
-                case ASTNodeType.GREATER_THAN:
-                    return lhs.CompareTo(rhs) > 0;
-                case ASTNodeType.GREATER_THAN_OR_EQUAL:
-                    return lhs.CompareTo(rhs) >= 0;
+                // Evaluate the whole expression
+                switch (op)
+                {
+                    case ASTNodeType.EQUAL:
+                        return lhs.CompareTo(rhs) == 0;
+                    case ASTNodeType.NOT_EQUAL:
+                        return lhs.CompareTo(rhs) != 0;
+                    case ASTNodeType.LESS_THAN:
+                        return lhs.CompareTo(rhs) < 0;
+                    case ASTNodeType.LESS_THAN_OR_EQUAL:
+                        return lhs.CompareTo(rhs) <= 0;
+                    case ASTNodeType.GREATER_THAN:
+                        return lhs.CompareTo(rhs) > 0;
+                    case ASTNodeType.GREATER_THAN_OR_EQUAL:
+                        return lhs.CompareTo(rhs) >= 0;
+                }
+            }
+            catch (ArgumentException e)
+            {
+                throw new RunTimeError(node, e.Message);
             }
 
             throw new RunTimeError(node, "Unknown operator in expression");
@@ -975,7 +982,8 @@ namespace UOScript
             switch (node.Type)
             {
                 case ASTNodeType.INTEGER:
-                    val = TypeConverter.ToInt(node.Lexeme);
+                    // to facilitate comparisons, convert ints to doubles
+                    val = TypeConverter.ToDouble(node.Lexeme);
                     break;
                 case ASTNodeType.SERIAL:
                     val = TypeConverter.ToUInt(node.Lexeme);
