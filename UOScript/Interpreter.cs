@@ -1297,6 +1297,16 @@ namespace UOScript
             _executionState = ExecutionState.PAUSED;
         }
 
+        // Unpause execution
+        public static void Unpause()
+        {
+            if (_executionState != ExecutionState.PAUSED)
+                return;
+
+            _pauseTimeout = 0;
+            _executionState = ExecutionState.RUNNING;
+        }
+
         // If forward progress on the script isn't made within this
         // amount of time, bail
         public static void Timeout(long duration)
