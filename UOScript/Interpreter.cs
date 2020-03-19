@@ -809,6 +809,8 @@ namespace UOScript
             return (_statement != null) ? true : false;
         }
 
+        public void Advance() { _statement = _statement.Next(); }
+
         private ASTNode EvaluateModifiers(ASTNode node, out bool quiet, out bool force, out bool not)
         {
             quiet = false;
@@ -1052,8 +1054,11 @@ namespace UOScript
             TIMING_OUT
         };
 
+        public delegate bool TimeoutCallback();
+
         private static ExecutionState _executionState = ExecutionState.RUNNING;
         private static long _pauseTimeout = long.MaxValue;
+        private static  TimeoutCallback _timeoutCallback = null;
 
         public static CultureInfo Culture;
 
@@ -1272,8 +1277,25 @@ namespace UOScript
             {
                 if (_pauseTimeout >= DateTime.UtcNow.Ticks)
                 {
-                    _activeScript = null;
-                    return false;
+                    if (_timeoutCallback != null)
+                    {
+                        if (_timeoutCallback())
+                        {
+                            _activeScript.Advance();
+                            ClearTimeout();
+                        }
+
+                        _timeoutCallback = null;
+                    }
+
+                    /* If the callback changed the state to running, continue
+                     * on. Otherwise, exit.
+                     */
+                    if (_executionState != ExecutionState.RUNNING)
+                    {
+                        _activeScript = null;
+                        return false;
+                    }
                 }
             }
 
@@ -1309,7 +1331,7 @@ namespace UOScript
 
         // If forward progress on the script isn't made within this
         // amount of time, bail
-        public static void Timeout(long duration)
+        public static void Timeout(long duration, TimeoutCallback callback)
         {
             // Don't change an existing timeout
             if (_executionState != ExecutionState.RUNNING)
@@ -1317,6 +1339,7 @@ namespace UOScript
 
             _pauseTimeout = DateTime.UtcNow.Ticks + duration;
             _executionState = ExecutionState.TIMING_OUT;
+            _timeoutCallback = callback;
         }
 
         // Clears any previously set timeout. Automatically
