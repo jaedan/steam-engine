@@ -949,6 +949,23 @@ namespace UOScript
             // Evaluate the right hand side
             var rhs = EvaluateBinaryOperand(ref node);
 
+            if (lhs.GetType() != rhs.GetType())
+            {
+                // Different types. Try to convert one to match the other.
+
+                // Special case for rhs doubles because we don't want to lose precision.
+                if (rhs is double)
+                {
+                    double tmp = (double)lhs;
+                    lhs = tmp;
+                }
+                else
+                {
+                    var tmp = Convert.ChangeType(rhs, lhs.GetType());
+                    rhs = (IComparable)tmp;
+                }
+            }
+
             try
             {
                 // Evaluate the whole expression
@@ -984,8 +1001,7 @@ namespace UOScript
             switch (node.Type)
             {
                 case ASTNodeType.INTEGER:
-                    // to facilitate comparisons, convert ints to doubles
-                    val = TypeConverter.ToDouble(node.Lexeme);
+                    val = TypeConverter.ToInt(node.Lexeme);
                     break;
                 case ASTNodeType.SERIAL:
                     val = TypeConverter.ToUInt(node.Lexeme);
