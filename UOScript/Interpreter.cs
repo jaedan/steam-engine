@@ -798,10 +798,7 @@ namespace UOScript
                 case ASTNodeType.FORCE:
                 case ASTNodeType.COMMAND:
                     if (ExecuteCommand(node))
-                    {
-                        Interpreter.ClearTimeout();
                         _statement = _statement.Next();
-                    }
 
                     break;
             }
@@ -1284,14 +1281,14 @@ namespace UOScript
 
             if (_executionState == ExecutionState.PAUSED)
             {
-                if (_pauseTimeout >= DateTime.UtcNow.Ticks)
+                if (_pauseTimeout < DateTime.UtcNow.Ticks)
                     _executionState = ExecutionState.RUNNING;
                 else
                     return true;
             }
             else if (_executionState == ExecutionState.TIMING_OUT)
             {
-                if (_pauseTimeout >= DateTime.UtcNow.Ticks)
+                if (_pauseTimeout < DateTime.UtcNow.Ticks)
                 {
                     if (_timeoutCallback != null)
                     {
@@ -1324,14 +1321,14 @@ namespace UOScript
             return true;
         }
 
-        // Pause execution for the given number of ticks (as defined by DateTime.UtcNow)
+        // Pause execution for the given number of milliseconds
         public static void Pause(long duration)
         {
             // Already paused or timing out
             if (_executionState != ExecutionState.RUNNING)
                 return;
 
-            _pauseTimeout = DateTime.UtcNow.Ticks + duration;
+            _pauseTimeout = DateTime.UtcNow.Ticks + (duration * 10000);
             _executionState = ExecutionState.PAUSED;
         }
 
@@ -1346,14 +1343,14 @@ namespace UOScript
         }
 
         // If forward progress on the script isn't made within this
-        // amount of time, bail
+        // amount of time (milliseconds), bail
         public static void Timeout(long duration, TimeoutCallback callback)
         {
             // Don't change an existing timeout
             if (_executionState != ExecutionState.RUNNING)
                 return;
 
-            _pauseTimeout = DateTime.UtcNow.Ticks + duration;
+            _pauseTimeout = DateTime.UtcNow.Ticks + (duration * 10000);
             _executionState = ExecutionState.TIMING_OUT;
             _timeoutCallback = callback;
         }
