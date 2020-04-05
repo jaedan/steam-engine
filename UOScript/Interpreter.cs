@@ -463,7 +463,11 @@ namespace UOScript
                     break;
                 case ASTNodeType.WHILE:
                     {
-                        PushScope(node);
+                        // When we first enter the loop, push a new scope
+                        if (_scope.StartNode != node)
+                        {
+                            PushScope(node);
+                        }
 
                         var expr = node.FirstChild();
                         var result = EvaluateExpression(ref expr);
@@ -531,8 +535,6 @@ namespace UOScript
                     if (_statement == null)
                         throw new RunTimeError(node, "Unexpected endwhile");
 
-                    PopScope();
-
                     break;
                 case ASTNodeType.FOR:
                     {
@@ -598,7 +600,6 @@ namespace UOScript
                                     if (depth == 0)
                                     {
                                         PopScope();
-
                                         // Go one past the end so the loop doesn't repeat
                                         _statement = _statement.Next();
                                         break;
@@ -609,8 +610,6 @@ namespace UOScript
 
                                 _statement = _statement.Next();
                             }
-
-                            PopScope();
                         }
                     }
                     break;
@@ -684,7 +683,6 @@ namespace UOScript
                                     if (depth == 0)
                                     {
                                         PopScope();
-
                                         // Go one past the end so the loop doesn't repeat
                                         _statement = _statement.Next();
                                         break;
@@ -695,8 +693,6 @@ namespace UOScript
 
                                 _statement = _statement.Next();
                             }
-
-                            PopScope();
                         }
                         break;
                     }
