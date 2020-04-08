@@ -342,7 +342,7 @@ namespace UOScript
                             break;
 
                         // The expression evaluated false, so keep advancing until
-                        // we hit an elseif, else, or, endif statement that matches
+                        // we hit an elseif, else, or endif statement that matches
                         // and try again.
                         depth = 0;
 
@@ -356,41 +356,34 @@ namespace UOScript
                             }
                             else if (node.Type == ASTNodeType.ELSEIF)
                             {
-                                if (depth > 0)
+                                if (depth == 0)
                                 {
-                                    continue;
-                                }
+                                    expr = node.FirstChild();
+                                    result = EvaluateExpression(ref expr);
 
-                                expr = node.FirstChild();
-                                result = EvaluateExpression(ref expr);
-
-                                // Evaluated true. Jump right into execution
-                                if (result)
-                                {
-                                    _statement = _statement.Next();
-                                    break;
+                                    // Evaluated true. Jump right into execution
+                                    if (result)
+                                    {
+                                        _statement = _statement.Next();
+                                        break;
+                                    }
                                 }
                             }
                             else if (node.Type == ASTNodeType.ELSE)
                             {
-                                if (depth > 0)
+                                if (depth == 0)
                                 {
-                                    continue;
+                                    // Jump into the else clause
+                                    _statement = _statement.Next();
+                                    break;
                                 }
-
-                                // Jump into the else clause
-                                _statement = _statement.Next();
-                                break;
                             }
                             else if (node.Type == ASTNodeType.ENDIF)
                             {
-                                if (depth > 0)
-                                {
-                                    depth--;
-                                    continue;
-                                }
+                                if (depth == 0)
+                                    break;
 
-                                break;
+                                depth--;
                             }
 
                             _statement = _statement.Next();
