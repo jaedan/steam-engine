@@ -60,6 +60,7 @@
   <ItemGroup>
     <Compile Include="Interpreter.cs" />
     <Compile Include="Lexer.cs" />
+    <Compile Include="TextParser.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Properties\" />
