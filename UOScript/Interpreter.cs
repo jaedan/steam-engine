@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 
-namespace UOSteam
+namespace UOScript
 {
     public class RunTimeError : Exception
     {
@@ -12,6 +12,74 @@ namespace UOSteam
         public RunTimeError(ASTNode node, string error) : base(error)
         {
             Node = node;
+        }
+    }
+
+    internal static class TypeConverter
+    {
+        public static int ToInt(string token)
+        {
+            int val;
+
+            if (token.StartsWith("0x"))
+            {
+                if (int.TryParse(token.Substring(2), NumberStyles.HexNumber, Interpreter.Culture, out val))
+                    return val;
+            }
+            else if (int.TryParse(token, out val))
+                return val;
+
+            throw new RunTimeError(null, "Cannot convert argument to int");
+        }
+
+        public static uint ToUInt(string token)
+        {
+            uint val;
+
+            if (token.StartsWith("0x"))
+            {
+                if (uint.TryParse(token.Substring(2), NumberStyles.HexNumber, Interpreter.Culture, out val))
+                    return val;
+            }
+            else if (uint.TryParse(token, out val))
+                return val;
+
+            throw new RunTimeError(null, "Cannot convert argument to uint");
+        }
+
+        public static ushort ToUShort(string token)
+        {
+            ushort val;
+
+            if (token.StartsWith("0x"))
+            {
+                if (ushort.TryParse(token.Substring(2), NumberStyles.HexNumber, Interpreter.Culture, out val))
+                    return val;
+            }
+            else if (ushort.TryParse(token, out val))
+                return val;
+
+            throw new RunTimeError(null, "Cannot convert argument to ushort");
+        }
+
+        public static double ToDouble(string token)
+        {
+            double val;
+
+            if (double.TryParse(token, out val))
+                return val;
+
+            throw new RunTimeError(null, "Cannot convert argument to double");
+        }
+
+        public static bool ToBool(string token)
+        {
+            bool val;
+
+            if (bool.TryParse(token, out val))
+                return val;
+
+            throw new RunTimeError(null, "Cannot convert argument to bool");
         }
     }
 
@@ -71,17 +139,7 @@ namespace UOSteam
             if (arg != null)
                 return arg.AsInt();
 
-            int val;
-
-            if (_node.Lexeme.StartsWith("0x"))
-            {
-                if (int.TryParse(_node.Lexeme.Substring(2), NumberStyles.HexNumber, Interpreter.Culture, out val))
-                    return val;
-            }
-            else if (int.TryParse(_node.Lexeme, out val))
-                return val;
-
-            throw new RunTimeError(_node, "Cannot convert argument to int");
+            return TypeConverter.ToInt(_node.Lexeme);
         }
 
         // Treat the argument as an unsigned integer
@@ -95,17 +153,20 @@ namespace UOSteam
             if (arg != null)
                 return arg.AsUInt();
 
-            uint val;
+            return TypeConverter.ToUInt(_node.Lexeme);
+        }
 
-            if (_node.Lexeme.StartsWith("0x"))
-            {
-                if (uint.TryParse(_node.Lexeme.Substring(2), NumberStyles.HexNumber, Interpreter.Culture, out val))
-                    return val;
-            }
-            else if (uint.TryParse(_node.Lexeme, out val))
-                return val;
+        public ushort AsUShort()
+        {
+            if (_node.Lexeme == null)
+                throw new RunTimeError(_node, "Cannot convert argument to ushort");
 
-            throw new RunTimeError(_node, "Cannot convert argument to uint");
+            // Try to resolve it as a scoped variable first
+            var arg = _script.Lookup(_node.Lexeme);
+            if (arg != null)
+                return arg.AsUShort();
+
+            return TypeConverter.ToUShort(_node.Lexeme);
         }
 
         // Treat the argument as a serial or an alias. Aliases will
@@ -140,6 +201,14 @@ namespace UOSteam
                 return arg.AsString();
 
             return _node.Lexeme;
+        }
+
+        public bool AsBool()
+        {
+            if (_node.Lexeme == null)
+                throw new RunTimeError(_node, "Cannot convert argument to bool");
+
+            return TypeConverter.ToBool(_node.Lexeme);
         }
 
         public override bool Equals(object obj)
@@ -273,7 +342,7 @@ namespace UOSteam
                             break;
 
                         // The expression evaluated false, so keep advancing until
-                        // we hit an elseif, else, or, endif statement that matches
+                        // we hit an elseif, else, or endif statement that matches
                         // and try again.
                         depth = 0;
 
@@ -287,41 +356,34 @@ namespace UOSteam
                             }
                             else if (node.Type == ASTNodeType.ELSEIF)
                             {
-                                if (depth > 0)
+                                if (depth == 0)
                                 {
-                                    continue;
-                                }
+                                    expr = node.FirstChild();
+                                    result = EvaluateExpression(ref expr);
 
-                                expr = node.FirstChild();
-                                result = EvaluateExpression(ref expr);
-
-                                // Evaluated true. Jump right into execution
-                                if (result)
-                                {
-                                    _statement = _statement.Next();
-                                    break;
+                                    // Evaluated true. Jump right into execution
+                                    if (result)
+                                    {
+                                        _statement = _statement.Next();
+                                        break;
+                                    }
                                 }
                             }
                             else if (node.Type == ASTNodeType.ELSE)
                             {
-                                if (depth > 0)
+                                if (depth == 0)
                                 {
-                                    continue;
+                                    // Jump into the else clause
+                                    _statement = _statement.Next();
+                                    break;
                                 }
-
-                                // Jump into the else clause
-                                _statement = _statement.Next();
-                                break;
                             }
                             else if (node.Type == ASTNodeType.ENDIF)
                             {
-                                if (depth > 0)
-                                {
-                                    depth--;
-                                    continue;
-                                }
+                                if (depth == 0)
+                                    break;
 
-                                break;
+                                depth--;
                             }
 
                             _statement = _statement.Next();
@@ -394,7 +456,11 @@ namespace UOSteam
                     break;
                 case ASTNodeType.WHILE:
                     {
-                        PushScope(node);
+                        // When we first enter the loop, push a new scope
+                        if (_scope.StartNode != node)
+                        {
+                            PushScope(node);
+                        }
 
                         var expr = node.FirstChild();
                         var result = EvaluateExpression(ref expr);
@@ -462,8 +528,6 @@ namespace UOSteam
                     if (_statement == null)
                         throw new RunTimeError(node, "Unexpected endwhile");
 
-                    PopScope();
-
                     break;
                 case ASTNodeType.FOR:
                     {
@@ -482,7 +546,7 @@ namespace UOSteam
                                 throw new RunTimeError(max, "Invalid for loop syntax");
 
                             // Create a dummy argument that acts as our loop variable
-                            var iter = new ASTNode(ASTNodeType.INTEGER, "0", node);
+                            var iter = new ASTNode(ASTNodeType.INTEGER, "0", node, 0);
 
                             _scope.SetVar(iterName, new Argument(this, iter));
                         }
@@ -491,7 +555,7 @@ namespace UOSteam
                             // Increment the iterator argument
                             var arg = _scope.GetVar(iterName);
 
-                            var iter = new ASTNode(ASTNodeType.INTEGER, (arg.AsUInt() + 1).ToString(), node);
+                            var iter = new ASTNode(ASTNodeType.INTEGER, (arg.AsUInt() + 1).ToString(), node, 0);
 
                             _scope.SetVar(iterName, new Argument(this, iter));
                         }
@@ -529,7 +593,6 @@ namespace UOSteam
                                     if (depth == 0)
                                     {
                                         PopScope();
-
                                         // Go one past the end so the loop doesn't repeat
                                         _statement = _statement.Next();
                                         break;
@@ -540,8 +603,6 @@ namespace UOSteam
 
                                 _statement = _statement.Next();
                             }
-
-                            PopScope();
                         }
                     }
                     break;
@@ -559,7 +620,7 @@ namespace UOSteam
                             PushScope(node);
 
                             // Create a dummy argument that acts as our iterator object
-                            var iter = new ASTNode(ASTNodeType.INTEGER, "0", node);
+                            var iter = new ASTNode(ASTNodeType.INTEGER, "0", node, 0);
                             _scope.SetVar(iterName, new Argument(this, iter));
 
                             // Make the user-chosen variable have the value for the front of the list
@@ -574,7 +635,7 @@ namespace UOSteam
                         {
                             // Increment the iterator argument
                             var idx = _scope.GetVar(iterName).AsInt() + 1;
-                            var iter = new ASTNode(ASTNodeType.INTEGER, idx.ToString(), node);
+                            var iter = new ASTNode(ASTNodeType.INTEGER, idx.ToString(), node, 0);
                             _scope.SetVar(iterName, new Argument(this, iter));
 
                             // Update the user-chosen variable
@@ -615,7 +676,6 @@ namespace UOSteam
                                     if (depth == 0)
                                     {
                                         PopScope();
-
                                         // Go one past the end so the loop doesn't repeat
                                         _statement = _statement.Next();
                                         break;
@@ -626,8 +686,6 @@ namespace UOSteam
 
                                 _statement = _statement.Next();
                             }
-
-                            PopScope();
                         }
                         break;
                     }
@@ -730,11 +788,14 @@ namespace UOSteam
                 case ASTNodeType.COMMAND:
                     if (ExecuteCommand(node))
                         _statement = _statement.Next();
+
                     break;
             }
 
             return (_statement != null) ? true : false;
         }
+
+        public void Advance() { _statement = _statement.Next(); }
 
         private ASTNode EvaluateModifiers(ASTNode node, out bool quiet, out bool force, out bool not)
         {
@@ -849,65 +910,6 @@ namespace UOSteam
         {
             node = EvaluateModifiers(node, out bool quiet, out _, out bool not);
 
-            // Unary expressions are converted to bool.
-            var result = ExecuteExpression(ref node, quiet) != 0;
-
-            if (not)
-                return !result;
-            else
-                return result;
-        }
-
-        private bool EvaluateBinaryExpression(ref ASTNode node)
-        {
-            int lhs;
-            int rhs;
-
-            // Evaluate the left hand side
-            node = EvaluateModifiers(node, out bool quiet, out _, out _);
-            if (node.Type == ASTNodeType.INTEGER)
-            {
-                lhs = int.Parse(node.Lexeme);
-                node = node.Next();
-            }
-            else
-                lhs = ExecuteExpression(ref node, quiet);
-
-            // Capture the operator
-            var op = node.Type;
-            node = node.Next();
-
-            // Evaluate the right hand side
-            node = EvaluateModifiers(node, out quiet, out _, out _);
-            if (node.Type == ASTNodeType.INTEGER)
-            {
-                rhs = int.Parse(node.Lexeme);
-                node = node.Next();
-            }
-            else
-                rhs = ExecuteExpression(ref node, quiet);
-
-            switch (op)
-            {
-                case ASTNodeType.EQUAL:
-                    return lhs == rhs;
-                case ASTNodeType.NOT_EQUAL:
-                    return lhs != rhs;
-                case ASTNodeType.LESS_THAN:
-                    return lhs < rhs;
-                case ASTNodeType.LESS_THAN_OR_EQUAL:
-                    return lhs <= rhs;
-                case ASTNodeType.GREATER_THAN:
-                    return lhs > rhs;
-                case ASTNodeType.GREATER_THAN_OR_EQUAL:
-                    return lhs >= rhs;
-            }
-
-            throw new RunTimeError(node, "Invalid operator type in expression");
-        }
-
-        private int ExecuteExpression(ref ASTNode node, bool quiet)
-        {
             var handler = Interpreter.GetExpressionHandler(node.Lexeme);
 
             if (handler == null)
@@ -915,7 +917,108 @@ namespace UOSteam
 
             var result = handler(node.Lexeme, ConstructArguments(ref node), quiet);
 
-            return result;
+            if (not)
+                return result.CompareTo(true) != 0;
+            else
+                return result.CompareTo(true) == 0;
+        }
+
+        private bool EvaluateBinaryExpression(ref ASTNode node)
+        {
+            // Evaluate the left hand side
+            var lhs = EvaluateBinaryOperand(ref node);
+
+            // Capture the operator
+            var op = node.Type;
+            node = node.Next();
+
+            // Evaluate the right hand side
+            var rhs = EvaluateBinaryOperand(ref node);
+
+            if (lhs.GetType() != rhs.GetType())
+            {
+                // Different types. Try to convert one to match the other.
+
+                // Special case for rhs doubles because we don't want to lose precision.
+                if (rhs is double)
+                {
+                    double tmp = (double)lhs;
+                    lhs = tmp;
+                }
+                else
+                {
+                    var tmp = Convert.ChangeType(rhs, lhs.GetType());
+                    rhs = (IComparable)tmp;
+                }
+            }
+
+            try
+            {
+                // Evaluate the whole expression
+                switch (op)
+                {
+                    case ASTNodeType.EQUAL:
+                        return lhs.CompareTo(rhs) == 0;
+                    case ASTNodeType.NOT_EQUAL:
+                        return lhs.CompareTo(rhs) != 0;
+                    case ASTNodeType.LESS_THAN:
+                        return lhs.CompareTo(rhs) < 0;
+                    case ASTNodeType.LESS_THAN_OR_EQUAL:
+                        return lhs.CompareTo(rhs) <= 0;
+                    case ASTNodeType.GREATER_THAN:
+                        return lhs.CompareTo(rhs) > 0;
+                    case ASTNodeType.GREATER_THAN_OR_EQUAL:
+                        return lhs.CompareTo(rhs) >= 0;
+                }
+            }
+            catch (ArgumentException e)
+            {
+                throw new RunTimeError(node, e.Message);
+            }
+
+            throw new RunTimeError(node, "Unknown operator in expression");
+        }
+
+        private IComparable EvaluateBinaryOperand(ref ASTNode node)
+        {
+            IComparable val;
+
+            node = EvaluateModifiers(node, out bool quiet, out _, out _);
+            switch (node.Type)
+            {
+                case ASTNodeType.INTEGER:
+                    val = TypeConverter.ToInt(node.Lexeme);
+                    break;
+                case ASTNodeType.SERIAL:
+                    val = TypeConverter.ToUInt(node.Lexeme);
+                    break;
+                case ASTNodeType.STRING:
+                    val = node.Lexeme;
+                    break;
+                case ASTNodeType.DOUBLE:
+                    val = TypeConverter.ToDouble(node.Lexeme);
+                    break;
+                case ASTNodeType.OPERAND:
+                    {
+                        // This might be a registered keyword, so do a lookup
+                        var handler = Interpreter.GetExpressionHandler(node.Lexeme);
+
+                        if (handler == null)
+                        {
+                            // It's just a string
+                            val = node.Lexeme;
+                        }
+                        else
+                        {
+                            val = handler(node.Lexeme, ConstructArguments(ref node), quiet);
+                        }
+                        break;
+                    }
+                default:
+                    throw new RunTimeError(node, "Invalid type found in expression");
+            }
+
+            return val;
         }
     }
 
@@ -927,7 +1030,12 @@ namespace UOSteam
         // Lists
         private static Dictionary<string, List<Argument>> _lists = new Dictionary<string, List<Argument>>();
 
-        public delegate int ExpressionHandler(string expression, Argument[] args, bool quiet);
+        // Timers
+        private static Dictionary<string, DateTime> _timers = new Dictionary<string, DateTime>();
+
+        // Expressions
+        public delegate IComparable ExpressionHandler(string expression, Argument[] args, bool quiet);
+        public delegate T ExpressionHandler<T>(string expression, Argument[] args, bool quiet) where T : IComparable;
 
         private static Dictionary<string, ExpressionHandler> _exprHandlers = new Dictionary<string, ExpressionHandler>();
 
@@ -939,27 +1047,40 @@ namespace UOSteam
 
         private static Dictionary<string, AliasHandler> _aliasHandlers = new Dictionary<string, AliasHandler>();
 
-        private static LinkedList<Script> _scripts = new LinkedList<Script>();
+        private static Script _activeScript = null;
+
+        private enum ExecutionState
+        {
+            RUNNING,
+            PAUSED,
+            TIMING_OUT
+        };
+
+        public delegate bool TimeoutCallback();
+
+        private static ExecutionState _executionState = ExecutionState.RUNNING;
+        private static long _pauseTimeout = long.MaxValue;
+        private static  TimeoutCallback _timeoutCallback = null;
 
         public static CultureInfo Culture;
 
         static Interpreter()
         {
-            Culture = new CultureInfo("en-EN", false);
+            Culture = new CultureInfo(CultureInfo.CurrentCulture.LCID, false);
             Culture.NumberFormat.NumberDecimalSeparator = ".";
             Culture.NumberFormat.NumberGroupSeparator = ",";
         }
 
-        public static void RegisterExpressionHandler(string keyword, ExpressionHandler handler)
+        public static void RegisterExpressionHandler<T>(string keyword, ExpressionHandler<T> handler) where T : IComparable
         {
-            _exprHandlers[keyword] = handler;
+            _exprHandlers[keyword] = (expression, args, quiet) => handler(expression, args, quiet);
         }
 
         public static ExpressionHandler GetExpressionHandler(string keyword)
         {
-            _exprHandlers.TryGetValue(keyword, out ExpressionHandler handler);
+            _exprHandlers.TryGetValue(keyword, out var expression);
 
-            return handler;
+            return expression;
         }
 
         public static void RegisterCommandHandler(string keyword, CommandHandler handler)
@@ -977,6 +1098,11 @@ namespace UOSteam
         public static void RegisterAliasHandler(string keyword, AliasHandler handler)
         {
             _aliasHandlers[keyword] = handler;
+        }
+
+        public static void UnregisterAliasHandler(string keyword)
+        {
+            _aliasHandlers.Remove(keyword);
         }
 
         public static uint GetAlias(string alias)
@@ -1086,31 +1212,144 @@ namespace UOSteam
             return null;
         }
 
-        public static void StartScript(Script script)
+        public static void CreateTimer(string name)
         {
-            _scripts.AddLast(script);
+            _timers[name] = DateTime.UtcNow;
         }
 
-        public static void StopScript(Script script)
+        public static TimeSpan GetTimer(string name)
         {
-            _scripts.Remove(script);
+            if (!_timers.TryGetValue(name, out DateTime timestamp))
+                throw new RunTimeError(null, "Timer does not exist");
+
+            TimeSpan elapsed = DateTime.UtcNow - timestamp;
+
+            return elapsed;
         }
 
-        public static bool ExecuteScripts()
+        public static void SetTimer(string name, int elapsed)
         {
-            var node = _scripts.Last;
+            // Setting a timer to start at a given value is equivalent to
+            // starting the timer that number of milliseconds in the past.
+            _timers[name] = DateTime.UtcNow.AddMilliseconds(-elapsed);
+        }
 
-            while (node != null)
+        public static void RemoveTimer(string name)
+        {
+            _timers.Remove(name);
+        }
+
+        public static bool TimerExists(string name)
+        {
+            return _timers.ContainsKey(name);
+        }
+
+        public static bool StartScript(Script script)
+        {
+            if (_activeScript != null)
+                return false;
+
+            _activeScript = script;
+            _executionState = ExecutionState.RUNNING;
+
+            ExecuteScript();
+
+            return true;
+        }
+
+        public static void StopScript()
+        {
+            _activeScript = null;
+            _executionState = ExecutionState.RUNNING;
+        }
+
+        public static bool ExecuteScript()
+        {
+            if (_activeScript == null)
+                return false;
+
+            if (_executionState == ExecutionState.PAUSED)
             {
-                var prev = node.Previous;
+                if (_pauseTimeout < DateTime.UtcNow.Ticks)
+                    _executionState = ExecutionState.RUNNING;
+                else
+                    return true;
+            }
+            else if (_executionState == ExecutionState.TIMING_OUT)
+            {
+                if (_pauseTimeout < DateTime.UtcNow.Ticks)
+                {
+                    if (_timeoutCallback != null)
+                    {
+                        if (_timeoutCallback())
+                        {
+                            _activeScript.Advance();
+                            ClearTimeout();
+                        }
 
-                if (!node.Value.ExecuteNext())
-                    _scripts.Remove(node);
+                        _timeoutCallback = null;
+                    }
 
-                node = prev;
+                    /* If the callback changed the state to running, continue
+                     * on. Otherwise, exit.
+                     */
+                    if (_executionState != ExecutionState.RUNNING)
+                    {
+                        _activeScript = null;
+                        return false;
+                    }
+                }
             }
 
-            return _scripts.Count > 0;
+            if (!_activeScript.ExecuteNext())
+            {
+                _activeScript = null;
+                return false;
+            }
+
+            return true;
+        }
+
+        // Pause execution for the given number of milliseconds
+        public static void Pause(long duration)
+        {
+            // Already paused or timing out
+            if (_executionState != ExecutionState.RUNNING)
+                return;
+
+            _pauseTimeout = DateTime.UtcNow.Ticks + (duration * 10000);
+            _executionState = ExecutionState.PAUSED;
+        }
+
+        // Unpause execution
+        public static void Unpause()
+        {
+            if (_executionState != ExecutionState.PAUSED)
+                return;
+
+            _pauseTimeout = 0;
+            _executionState = ExecutionState.RUNNING;
+        }
+
+        // If forward progress on the script isn't made within this
+        // amount of time (milliseconds), bail
+        public static void Timeout(long duration, TimeoutCallback callback)
+        {
+            // Don't change an existing timeout
+            if (_executionState != ExecutionState.RUNNING)
+                return;
+
+            _pauseTimeout = DateTime.UtcNow.Ticks + (duration * 10000);
+            _executionState = ExecutionState.TIMING_OUT;
+            _timeoutCallback = callback;
+        }
+
+        // Clears any previously set timeout. Automatically
+        // called any time the script advances a statement.
+        public static void ClearTimeout()
+        {
+            _pauseTimeout = 0;
+            _executionState = ExecutionState.RUNNING;
         }
     }
 }

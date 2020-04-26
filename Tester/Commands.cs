@@ -1,17 +1,31 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace UOSteam
+namespace UOScript
 {
     // This registers default handlers for all of the commands and expressions
     // so valid scripts will at least run for testing.
     public static class Commands
     {
-        private static int DummyExpression(string expression, Argument[] args, bool quiet)
+        private static IComparable DummyExpression(string expression, Argument[] args, bool quiet)
         {
             Console.WriteLine("Executing expression {0} {1}", expression, args);
 
             return 0;
+        }
+
+        private static int DummyIntExpression(string expression, Argument[] args, bool quiet)
+        {
+            Console.WriteLine("Executing expression {0} {1}", expression, args);
+
+            return 0;
+        }
+
+        private static string DummyStringExpression(string expression, Argument[] args, bool quiet)
+        {
+            Console.WriteLine("Executing expression {0} {1}", expression, args);
+
+            return "test";
         }
 
         private static bool DummyCommand(string command, Argument[] args, bool quiet, bool force)
@@ -190,9 +204,10 @@ namespace UOSteam
 
             // Player Attributes
             Interpreter.RegisterExpressionHandler("mana", DummyExpression);
-            Interpreter.RegisterExpressionHandler("x", DummyExpression);
+            Interpreter.RegisterExpressionHandler("x", DummyIntExpression);
             Interpreter.RegisterExpressionHandler("y", DummyExpression);
             Interpreter.RegisterExpressionHandler("z", DummyExpression);
+            Interpreter.RegisterExpressionHandler("name", DummyStringExpression);
 
             // Object attributes
 

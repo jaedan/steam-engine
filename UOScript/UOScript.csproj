@@ -7,8 +7,8 @@
     <ProjectGuid>{569EABF7-8980-4A3B-BF3A-6321C4B1DA78}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>UOSteam</RootNamespace>
-    <AssemblyName>UOSteam</AssemblyName>
+    <RootNamespace>UOScript</RootNamespace>
+    <AssemblyName>UOScript</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>

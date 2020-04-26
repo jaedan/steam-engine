@@ -94,13 +94,13 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Steam\UOSteam.csproj">
-      <Project>{569eabf7-8980-4a3b-bf3a-6321c4b1da78}</Project>
-      <Name>UOSteam</Name>
-    </ProjectReference>
+    <Folder Include="Properties\" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Properties\" />
+    <ProjectReference Include="..\UOScript\UOScript.csproj">
+      <Project>{569eabf7-8980-4a3b-bf3a-6321c4b1da78}</Project>
+      <Name>UOScript</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

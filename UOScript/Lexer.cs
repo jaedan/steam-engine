@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace UOSteam
+namespace UOScript
 {
     public class SyntaxError : Exception
     {
@@ -60,6 +60,7 @@ namespace UOSteam
         STRING,
         SERIAL,
         INTEGER,
+        DOUBLE,
         LIST,
 
         // Modifiers
@@ -70,6 +71,7 @@ namespace UOSteam
         SCRIPT,
         STATEMENT,
         COMMAND,
+        OPERAND,
         LOGICAL_EXPRESSION,
         UNARY_EXPRESSION,
         BINARY_EXPRESSION,
@@ -81,11 +83,12 @@ namespace UOSteam
         public readonly ASTNodeType Type;
         public readonly string Lexeme;
         public readonly ASTNode Parent;
+        public readonly int LineNumber;
 
         internal LinkedListNode<ASTNode> _node;
         private LinkedList<ASTNode> _children;
 
-        public ASTNode(ASTNodeType type, string lexeme, ASTNode parent)
+        public ASTNode(ASTNodeType type, string lexeme, ASTNode parent, int lineNumber)
         {
             Type = type;
             if (lexeme != null)
@@ -93,11 +96,12 @@ namespace UOSteam
             else
                 Lexeme = "";
             Parent = parent;
+            LineNumber = lineNumber;
         }
 
-        public ASTNode Push(ASTNodeType type, string lexeme)
+        public ASTNode Push(ASTNodeType type, string lexeme, int lineNumber)
         {
-            var node = new ASTNode(type, lexeme, this);
+            var node = new ASTNode(type, lexeme, this, lineNumber);
 
             if (_children == null)
                 _children = new LinkedList<ASTNode>();
@@ -134,6 +138,8 @@ namespace UOSteam
 
     public static class Lexer
     {
+        private static int _curLine = 0;
+
         public static T[] Slice<T>(this T[] src, int start, int end)
         {
             if (end < start)
@@ -152,15 +158,13 @@ namespace UOSteam
 
         public static ASTNode Lex(string[] lines)
         {
-            ASTNode node = new ASTNode(ASTNodeType.SCRIPT, null, null);
-
-            int i = 0;
+            ASTNode node = new ASTNode(ASTNodeType.SCRIPT, null, null, 0);
 
             try
             {
-                for (; i < lines.Length; i++)
+                for (_curLine = 0; _curLine < lines.Length; _curLine++)
                 {
-                    foreach (var l in lines[i].Split(';'))
+                    foreach (var l in lines[_curLine].Split(';'))
                     {
                         ParseLine(node, l);
                     }
@@ -168,11 +172,11 @@ namespace UOSteam
             }
             catch (SyntaxError e)
             {
-                throw new SyntaxError(lines[i], i, e.Node, e.Message);
+                throw new SyntaxError(lines[_curLine], _curLine, e.Node, e.Message);
             }
             catch (Exception e)
             {
-                throw new SyntaxError(lines[i], i, null, e.Message);
+                throw new SyntaxError(lines[_curLine], _curLine, null, e.Message);
             }
 
             return node;
@@ -180,11 +184,11 @@ namespace UOSteam
 
         public static ASTNode Lex(string fname)
         {
-            ASTNode node = new ASTNode(ASTNodeType.SCRIPT, null, null);
+            ASTNode node = new ASTNode(ASTNodeType.SCRIPT, null, null, 0);
 
             using (var file = new StreamReader(fname))
             {
-                int i = 0;
+                _curLine = 0;
                 string line = null;
 
                 try
@@ -203,16 +207,16 @@ namespace UOSteam
                         foreach (var l in line.Split(';'))
                             ParseLine(node, line);
 
-                        i++;
+                        _curLine++;
                     }
                 }
                 catch (SyntaxError e)
                 {
-                    throw new SyntaxError(line, i, e.Node, e.Message);
+                    throw new SyntaxError(line, _curLine, e.Node, e.Message);
                 }
                 catch (Exception e)
                 {
-                    throw new SyntaxError(line, i, null, e.Message);
+                    throw new SyntaxError(line, _curLine, null, e.Message);
                 }
             }
 
@@ -239,14 +243,16 @@ namespace UOSteam
             ParseStatement(node, lexemes);
         }
 
-        private static void ParseValue(ASTNode node, string lexeme)
+        private static void ParseValue(ASTNode node, string lexeme, ASTNodeType typeDefault)
         {
             if (lexeme.StartsWith("0x"))
-                node.Push(ASTNodeType.SERIAL, lexeme);
+                node.Push(ASTNodeType.SERIAL, lexeme, _curLine);
             else if (int.TryParse(lexeme, out _))
-                node.Push(ASTNodeType.INTEGER, lexeme);
+                node.Push(ASTNodeType.INTEGER, lexeme, _curLine);
+            else if (double.TryParse(lexeme, out _))
+                node.Push(ASTNodeType.DOUBLE, lexeme, _curLine);
             else
-                node.Push(ASTNodeType.STRING, lexeme);
+                node.Push(typeDefault, lexeme, _curLine);
         }
 
         private static void ParseCommand(ASTNode node, string lexeme)
@@ -255,7 +261,7 @@ namespace UOSteam
             // off.
             if (lexeme[0] == '@')
             {
-                node.Push(ASTNodeType.QUIET, null);
+                node.Push(ASTNodeType.QUIET, null, _curLine);
                 lexeme = lexeme.Substring(1, lexeme.Length - 1);
             }
 
@@ -263,11 +269,39 @@ namespace UOSteam
             // off.
             if (lexeme.EndsWith("!"))
             {
-                node.Push(ASTNodeType.FORCE, null);
+                node.Push(ASTNodeType.FORCE, null, _curLine);
                 lexeme = lexeme.Substring(0, lexeme.Length - 1);
             }
 
-            node.Push(ASTNodeType.COMMAND, lexeme);
+            node.Push(ASTNodeType.COMMAND, lexeme, _curLine);
+        }
+
+        private static void ParseOperand(ASTNode node, string lexeme)
+        {
+            bool modifier = false;
+
+            // An operand may start with an '@' symbol. Pick that
+            // off.
+            if (lexeme[0] == '@')
+            {
+                node.Push(ASTNodeType.QUIET, null, _curLine);
+                lexeme = lexeme.Substring(1, lexeme.Length - 1);
+                modifier = true;
+            }
+
+            // An operand may end with a '!' symbol. Pick that
+            // off.
+            if (lexeme.EndsWith("!"))
+            {
+                node.Push(ASTNodeType.FORCE, null, _curLine);
+                lexeme = lexeme.Substring(0, lexeme.Length - 1);
+                modifier = true;
+            }
+
+            if (!modifier)
+                ParseValue(node, lexeme, ASTNodeType.OPERAND);
+            else
+                node.Push(ASTNodeType.OPERAND, lexeme, _curLine);
         }
 
         private static void ParseOperator(ASTNode node, string lexeme)
@@ -276,22 +310,22 @@ namespace UOSteam
             {
                 case "==":
                 case "=":
-                    node.Push(ASTNodeType.EQUAL, null);
+                    node.Push(ASTNodeType.EQUAL, null, _curLine);
                     break;
                 case "!=":
-                    node.Push(ASTNodeType.NOT_EQUAL, null);
+                    node.Push(ASTNodeType.NOT_EQUAL, null, _curLine);
                     break;
                 case "<":
-                    node.Push(ASTNodeType.LESS_THAN, null);
+                    node.Push(ASTNodeType.LESS_THAN, null, _curLine);
                     break;
                 case "<=":
-                    node.Push(ASTNodeType.LESS_THAN_OR_EQUAL, null);
+                    node.Push(ASTNodeType.LESS_THAN_OR_EQUAL, null, _curLine);
                     break;
                 case ">":
-                    node.Push(ASTNodeType.GREATER_THAN, null);
+                    node.Push(ASTNodeType.GREATER_THAN, null, _curLine);
                     break;
                 case ">=":
-                    node.Push(ASTNodeType.GREATER_THAN_OR_EQUAL, null);
+                    node.Push(ASTNodeType.GREATER_THAN_OR_EQUAL, null, _curLine);
                     break;
                 default:
                     throw new SyntaxError(node, "Invalid operator in binary expression");
@@ -300,7 +334,7 @@ namespace UOSteam
 
         private static void ParseStatement(ASTNode node, string[] lexemes)
         {
-            var statement = node.Push(ASTNodeType.STATEMENT, null);
+            var statement = node.Push(ASTNodeType.STATEMENT, null, _curLine);
 
             // Examine the first word on the line
             switch (lexemes[0])
@@ -316,7 +350,7 @@ namespace UOSteam
                         if (lexemes.Length <= 1)
                             throw new SyntaxError(node, "Script compilation error");
 
-                        var t = statement.Push(ASTNodeType.IF, null);
+                        var t = statement.Push(ASTNodeType.IF, null, _curLine);
                         ParseLogicalExpression(t, lexemes.Slice(1, lexemes.Length - 1));
                         break;
                     }
@@ -325,7 +359,7 @@ namespace UOSteam
                         if (lexemes.Length <= 1)
                             throw new SyntaxError(node, "Script compilation error");
 
-                        var t = statement.Push(ASTNodeType.ELSEIF, null);
+                        var t = statement.Push(ASTNodeType.ELSEIF, null, _curLine);
                         ParseLogicalExpression(t, lexemes.Slice(1, lexemes.Length - 1));
                         break;
                     }
@@ -333,20 +367,20 @@ namespace UOSteam
                     if (lexemes.Length > 1)
                         throw new SyntaxError(node, "Script compilation error");
 
-                    statement.Push(ASTNodeType.ELSE, null);
+                    statement.Push(ASTNodeType.ELSE, null, _curLine);
                     break;
                 case "endif":
                     if (lexemes.Length > 1)
                         throw new SyntaxError(node, "Script compilation error");
 
-                    statement.Push(ASTNodeType.ENDIF, null);
+                    statement.Push(ASTNodeType.ENDIF, null, _curLine);
                     break;
                 case "while":
                     {
                         if (lexemes.Length <= 1)
                             throw new SyntaxError(node, "Script compilation error");
 
-                        var t = statement.Push(ASTNodeType.WHILE, null);
+                        var t = statement.Push(ASTNodeType.WHILE, null, _curLine);
                         ParseLogicalExpression(t, lexemes.Slice(1, lexemes.Length - 1));
                         break;
                     }
@@ -354,7 +388,7 @@ namespace UOSteam
                     if (lexemes.Length > 1)
                         throw new SyntaxError(node, "Script compilation error");
 
-                    statement.Push(ASTNodeType.ENDWHILE, null);
+                    statement.Push(ASTNodeType.ENDWHILE, null, _curLine);
                     break;
                 case "for":
                     {
@@ -376,31 +410,32 @@ namespace UOSteam
                     if (lexemes.Length > 1)
                         throw new SyntaxError(node, "Script compilation error");
 
-                    statement.Push(ASTNodeType.ENDFOR, null);
+                    statement.Push(ASTNodeType.ENDFOR, null, _curLine);
                     break;
                 case "break":
                     if (lexemes.Length > 1)
                         throw new SyntaxError(node, "Script compilation error");
 
-                    statement.Push(ASTNodeType.BREAK, null);
+                    statement.Push(ASTNodeType.BREAK, null, _curLine);
                     break;
                 case "continue":
                     if (lexemes.Length > 1)
                         throw new SyntaxError(node, "Script compilation error");
 
-                    statement.Push(ASTNodeType.CONTINUE, null);
+                    statement.Push(ASTNodeType.CONTINUE, null, _curLine);
                     break;
                 case "stop":
                     if (lexemes.Length > 1)
                         throw new SyntaxError(node, "Script compilation error");
 
-                    statement.Push(ASTNodeType.STOP, null);
+                    statement.Push(ASTNodeType.STOP, null, _curLine);
                     break;
                 case "replay":
+                case "loop":
                     if (lexemes.Length > 1)
                         throw new SyntaxError(node, "Script compilation error");
 
-                    statement.Push(ASTNodeType.REPLAY, null);
+                    statement.Push(ASTNodeType.REPLAY, null, _curLine);
                     break;
                 default:
                     // It's a regular statement.
@@ -408,7 +443,7 @@ namespace UOSteam
 
                     foreach (var lexeme in lexemes.Slice(1, lexemes.Length - 1))
                     {
-                        ParseValue(statement, lexeme);
+                        ParseValue(statement, lexeme, ASTNodeType.STRING);
                     }
                     break;
             }
@@ -447,13 +482,13 @@ namespace UOSteam
                 {
                     if (!logical)
                     {
-                        expr = node.Push(ASTNodeType.LOGICAL_EXPRESSION, null);
+                        expr = node.Push(ASTNodeType.LOGICAL_EXPRESSION, null, _curLine);
                         logical = true;
                     }
 
                     ParseExpression(expr, lexemes.Slice(start, i - 1));
                     start = i + 1;
-                    expr.Push(lexemes[i] == "and" ? ASTNodeType.AND : ASTNodeType.OR, null);
+                    expr.Push(lexemes[i] == "and" ? ASTNodeType.AND : ASTNodeType.OR, null, _curLine);
 
                 }
             }
@@ -501,66 +536,52 @@ namespace UOSteam
 
         private static void ParseUnaryExpression(ASTNode node, string[] lexemes)
         {
-            var expr = node.Push(ASTNodeType.UNARY_EXPRESSION, null);
+            var expr = node.Push(ASTNodeType.UNARY_EXPRESSION, null, _curLine);
 
             int i = 0;
 
             if (lexemes[i] == "not")
             {
-                expr.Push(ASTNodeType.NOT, null);
+                expr.Push(ASTNodeType.NOT, null, _curLine);
                 i++;
             }
 
-            ParseCommand(expr, lexemes[i++]);
+            ParseOperand(expr, lexemes[i++]);
 
             for (; i < lexemes.Length; i++)
             {
-                ParseValue(expr, lexemes[i]);
+                ParseValue(expr, lexemes[i], ASTNodeType.STRING);
             }
         }
 
         private static void ParseBinaryExpression(ASTNode node, string[] lexemes)
         {
-            var expr = node.Push(ASTNodeType.BINARY_EXPRESSION, null);
+            var expr = node.Push(ASTNodeType.BINARY_EXPRESSION, null, _curLine);
 
             int i = 0;
 
-            // The expressions on either side of the operator can be integer values
-            // or commands that need to be evaluated.
-            if (int.TryParse(lexemes[i], out int _))
-            {
-                ParseValue(expr, lexemes[i++]);
-            }
-            else
-            {
-                ParseCommand(expr, lexemes[i++]);
-            }
+            // The expressions on either side of the operator can be values
+            // or operands that need to be evaluated.
+            ParseOperand(expr, lexemes[i++]);
 
             for (; i < lexemes.Length; i++)
             {
                 if (IsOperator(lexemes[i]))
                     break;
 
-                ParseValue(expr, lexemes[i]);
+                ParseValue(expr, lexemes[i], ASTNodeType.STRING);
             }
 
             ParseOperator(expr, lexemes[i++]);
 
-            if (int.TryParse(lexemes[i], out int _))
-            {
-                ParseValue(expr, lexemes[i++]);
-            }
-            else
-            {
-                ParseCommand(expr, lexemes[i++]);
-            }
+            ParseOperand(expr, lexemes[i++]);
 
             for (; i < lexemes.Length; i++)
             {
                 if (IsOperator(lexemes[i]))
                     break;
 
-                ParseValue(expr, lexemes[i]);
+                ParseValue(expr, lexemes[i], ASTNodeType.STRING);
             }
         }
 
@@ -583,18 +604,18 @@ namespace UOSteam
             if (lexemes.Length == 1)
             {
                 // for X
-                var loop = statement.Push(ASTNodeType.FOR, null);
+                var loop = statement.Push(ASTNodeType.FOR, null, _curLine);
 
-                ParseValue(loop, lexemes[0]);
+                ParseValue(loop, lexemes[0], ASTNodeType.STRING);
 
             }
             else if (lexemes.Length == 3 && lexemes[1] == "to")
             {
                 // for X to LIST
-                var loop = statement.Push(ASTNodeType.FOREACH, null);
+                var loop = statement.Push(ASTNodeType.FOREACH, null, _curLine);
 
-                loop.Push(ASTNodeType.STRING, lexemes[2]);
-                loop.Push(ASTNodeType.LIST, lexemes[2].Substring(0, lexemes[2].Length - 2));
+                loop.Push(ASTNodeType.STRING, lexemes[2], _curLine);
+                loop.Push(ASTNodeType.LIST, lexemes[2].Substring(0, lexemes[2].Length - 2), _curLine);
             }
             else
             {
@@ -605,14 +626,14 @@ namespace UOSteam
         private static void ParseForEachLoop(ASTNode statement, string[] lexemes)
         {
             // foreach X in LIST
-            var loop = statement.Push(ASTNodeType.FOREACH, null);
+            var loop = statement.Push(ASTNodeType.FOREACH, null, _curLine);
 
             if (lexemes[1] != "in")
                 throw new SyntaxError(statement, "Invalid foreach loop");
 
             // This is the iterator name
-            ParseValue(loop, lexemes[0]);
-            loop.Push(ASTNodeType.LIST, lexemes[2]);
+            ParseValue(loop, lexemes[0], ASTNodeType.STRING);
+            loop.Push(ASTNodeType.LIST, lexemes[2], _curLine);
         }
     }
 }
