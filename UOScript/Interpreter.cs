@@ -335,7 +335,7 @@ namespace UOScript
                         var result = EvaluateExpression(ref expr);
 
                         // Advance to next statement
-                        _statement = _statement.Next();
+                        Advance();
 
                         // Evaluated true. Jump right into execution.
                         if (result)
@@ -364,7 +364,7 @@ namespace UOScript
                                     // Evaluated true. Jump right into execution
                                     if (result)
                                     {
-                                        _statement = _statement.Next();
+                                        Advance();
                                         break;
                                     }
                                 }
@@ -374,7 +374,7 @@ namespace UOScript
                                 if (depth == 0)
                                 {
                                     // Jump into the else clause
-                                    _statement = _statement.Next();
+                                    Advance();
                                     break;
                                 }
                             }
@@ -386,7 +386,7 @@ namespace UOScript
                                 depth--;
                             }
 
-                            _statement = _statement.Next();
+                            Advance();
                         }
 
                         if (_statement == null)
@@ -415,7 +415,7 @@ namespace UOScript
                             depth--;
                         }
 
-                        _statement = _statement.Next();
+                        Advance();
                     }
 
                     if (_statement == null)
@@ -424,7 +424,7 @@ namespace UOScript
                     break;
                 case ASTNodeType.ENDIF:
                     PopScope();
-                    _statement = _statement.Next();
+                    Advance();
                     break;
                 case ASTNodeType.ELSE:
                     // If we hit the else statement during normal advancing, skip over it. The only way
@@ -447,7 +447,7 @@ namespace UOScript
                             depth--;
                         }
 
-                        _statement = _statement.Next();
+                        Advance();
                     }
 
                     if (_statement == null)
@@ -466,7 +466,7 @@ namespace UOScript
                         var result = EvaluateExpression(ref expr);
 
                         // Advance to next statement
-                        _statement = _statement.Next();
+                        Advance();
 
                         // The expression evaluated false, so keep advancing until
                         // we hit an endwhile statement.
@@ -488,14 +488,14 @@ namespace UOScript
                                     {
                                         PopScope();
                                         // Go one past the endwhile so the loop doesn't repeat
-                                        _statement = _statement.Next();
+                                        Advance();
                                         break;
                                     }
 
                                     depth--;
                                 }
 
-                                _statement = _statement.Next();
+                                Advance();
                             }
                         }
                         break;
@@ -570,12 +570,12 @@ namespace UOScript
                         if (i.AsUInt() < end.AsUInt())
                         {
                             // enter the loop
-                            _statement = _statement.Next();
+                            Advance();
                         }
                         else
                         {
                             // Walk until the end of the loop
-                            _statement = _statement.Next();
+                            Advance();
 
                             depth = 0;
 
@@ -594,14 +594,14 @@ namespace UOScript
                                     {
                                         PopScope();
                                         // Go one past the end so the loop doesn't repeat
-                                        _statement = _statement.Next();
+                                        Advance();
                                         break;
                                     }
 
                                     depth--;
                                 }
 
-                                _statement = _statement.Next();
+                                Advance();
                             }
                         }
                     }
@@ -653,12 +653,12 @@ namespace UOScript
                         if (i != null)
                         {
                             // enter the loop
-                            _statement = _statement.Next();
+                            Advance();
                         }
                         else
                         {
                             // Walk until the end of the loop
-                            _statement = _statement.Next();
+                            Advance();
 
                             depth = 0;
 
@@ -677,14 +677,14 @@ namespace UOScript
                                     {
                                         PopScope();
                                         // Go one past the end so the loop doesn't repeat
-                                        _statement = _statement.Next();
+                                        Advance();
                                         break;
                                     }
 
                                     depth--;
                                 }
 
-                                _statement = _statement.Next();
+                                Advance();
                             }
                         }
                         break;
@@ -712,7 +712,7 @@ namespace UOScript
                     break;
                 case ASTNodeType.BREAK:
                     // Walk until the end of the loop
-                    _statement = _statement.Next();
+                    Advance();
 
                     depth = 0;
 
@@ -734,14 +734,14 @@ namespace UOScript
                                 PopScope();
 
                                 // Go one past the end so the loop doesn't repeat
-                                _statement = _statement.Next();
+                                Advance();
                                 break;
                             }
 
                             depth--;
                         }
 
-                        _statement = _statement.Next();
+                        Advance();
                     }
 
                     PopScope();
@@ -787,7 +787,7 @@ namespace UOScript
                 case ASTNodeType.FORCE:
                 case ASTNodeType.COMMAND:
                     if (ExecuteCommand(node))
-                        _statement = _statement.Next();
+                        Advance();
 
                     break;
             }
@@ -795,7 +795,11 @@ namespace UOScript
             return (_statement != null) ? true : false;
         }
 
-        public void Advance() { _statement = _statement.Next(); }
+        public void Advance()
+        {
+            Interpreter.ClearTimeout();
+            _statement = _statement.Next();
+        }
 
         private ASTNode EvaluateModifiers(ASTNode node, out bool quiet, out bool force, out bool not)
         {
@@ -1348,6 +1352,9 @@ namespace UOScript
         // called any time the script advances a statement.
         public static void ClearTimeout()
         {
+            if (_executionState != ExecutionState.TIMING_OUT)
+                return;
+
             _pauseTimeout = 0;
             _executionState = ExecutionState.RUNNING;
         }
