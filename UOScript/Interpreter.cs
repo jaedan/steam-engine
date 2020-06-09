@@ -910,44 +910,22 @@ namespace UOScript
             return lhs;
         }
 
-        private bool EvaluateUnaryExpression(ref ASTNode node)
+        private bool CompareOperands(ASTNodeType op, IComparable lhs, IComparable rhs)
         {
-            node = EvaluateModifiers(node, out bool quiet, out _, out bool not);
-
-            var handler = Interpreter.GetExpressionHandler(node.Lexeme);
-
-            if (handler == null)
-                throw new RunTimeError(node, "Unknown expression");
-
-            var result = handler(node.Lexeme, ConstructArguments(ref node), quiet);
-
-            if (not)
-                return result.CompareTo(true) != 0;
-            else
-                return result.CompareTo(true) == 0;
-        }
-
-        private bool EvaluateBinaryExpression(ref ASTNode node)
-        {
-            // Evaluate the left hand side
-            var lhs = EvaluateBinaryOperand(ref node);
-
-            // Capture the operator
-            var op = node.Type;
-            node = node.Next();
-
-            // Evaluate the right hand side
-            var rhs = EvaluateBinaryOperand(ref node);
-
             if (lhs.GetType() != rhs.GetType())
             {
                 // Different types. Try to convert one to match the other.
 
-                // Special case for rhs doubles because we don't want to lose precision.
                 if (rhs is double)
                 {
-                    double tmp = (double)lhs;
-                    lhs = tmp;
+                    // Special case for rhs doubles because we don't want to lose precision.
+                    lhs = (double)lhs;
+                }
+                else if (rhs is bool)
+                {
+                    // Special case for rhs bools because we want to down-convert the lhs.
+                    var tmp = Convert.ChangeType(lhs, typeof(bool));
+                    lhs = (IComparable)tmp;
                 }
                 else
                 {
@@ -977,10 +955,43 @@ namespace UOScript
             }
             catch (ArgumentException e)
             {
-                throw new RunTimeError(node, e.Message);
+                throw new RunTimeError(null, e.Message);
             }
 
-            throw new RunTimeError(node, "Unknown operator in expression");
+            throw new RunTimeError(null, "Unknown operator in expression");
+
+        }
+
+        private bool EvaluateUnaryExpression(ref ASTNode node)
+        {
+            node = EvaluateModifiers(node, out bool quiet, out _, out bool not);
+
+            var handler = Interpreter.GetExpressionHandler(node.Lexeme);
+
+            if (handler == null)
+                throw new RunTimeError(node, "Unknown expression");
+
+            var result = handler(node.Lexeme, ConstructArguments(ref node), quiet);
+
+            if (not)
+                return CompareOperands(ASTNodeType.EQUAL, result, false);
+            else
+                return CompareOperands(ASTNodeType.EQUAL, result, true);
+        }
+
+        private bool EvaluateBinaryExpression(ref ASTNode node)
+        {
+            // Evaluate the left hand side
+            var lhs = EvaluateBinaryOperand(ref node);
+
+            // Capture the operator
+            var op = node.Type;
+            node = node.Next();
+
+            // Evaluate the right hand side
+            var rhs = EvaluateBinaryOperand(ref node);
+
+            return CompareOperands(op, lhs, rhs);
         }
 
         private IComparable EvaluateBinaryOperand(ref ASTNode node)

@@ -18,7 +18,7 @@ namespace UOScript
         {
             Console.WriteLine("Executing expression {0} {1}", expression, args);
 
-            return 0;
+            return 3;
         }
 
         private static string DummyStringExpression(string expression, Argument[] args, bool quiet)
