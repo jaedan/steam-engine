@@ -1,10 +1,11 @@
-This is an implementation of the UO Steam scripting language. The interpreter is not tied to any particular program, but is instead extensible through the registration of command handlers. By default, all of the handlers print they were executed to the console.
+This is an implementation of the UO Steam scripting language engine. The interpreter is not tied to any particular program, but is instead extensible through the registration of command handlers.
 
 To run a test of the interpreter, first build it. The output will consist of a library named UOSteam.dll and an application called Tester.exe. The Tester.exe application currently expects a file named "test.uos" containing a Steam script in the same directory as the executable. You can try various valid Steam scripts and it will first print the parsed abstract syntax tree for the script, then execute it.
 
-TODO:
-* Lists
-* Aliases
+At this point, this project is considered complete. It supports all of the language features that the steam scripting language supported, plus some additional ones. This project has is used by the following projects:
+
+* Razor Community Edition - Implements a different set of commands than Steam
+* Razor Enhanced - Attempts to implement the exact same commands as Steam
 
 Steam Script Overview
 ----------------------
