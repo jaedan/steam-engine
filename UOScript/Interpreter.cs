@@ -740,8 +740,6 @@ namespace UOScript
                         {
                             if (depth == 0)
                             {
-                                PopScope();
-
                                 // Go one past the end so the loop doesn't repeat
                                 Advance();
                                 break;
