@@ -693,14 +693,23 @@ namespace UOScript
                     // Walk backward to the for statement
                     _statement = _statement.Prev();
 
+                    depth = 0;
+
                     while (_statement != null)
                     {
                         node = _statement.FirstChild();
 
-                        if (node.Type == ASTNodeType.FOR ||
-                            node.Type == ASTNodeType.FOREACH)
+                        if (node.Type == ASTNodeType.ENDFOR)
                         {
-                            break;
+                            depth++;
+                        }
+                        else if (node.Type == ASTNodeType.FOR ||
+                                 node.Type == ASTNodeType.FOREACH)
+                        {
+                            if (depth == 0)
+                                break;
+
+                            depth--;
                         }
 
                         _statement = _statement.Prev();
